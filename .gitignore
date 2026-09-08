@@ -1,0 +1,14 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Byte-compiled / cached files
+__pycache__/
+*.py[cod]
+
+# Local environment variable files (may contain secrets)
+.env
+
+# Generated PowerPoint output (keep committed sample decks tracked explicitly)
+Enterprise_Agreement_Summary.pptx
