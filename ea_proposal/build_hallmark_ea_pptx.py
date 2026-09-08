@@ -2,7 +2,8 @@
 """Build the Hallmark Cards Cisco Enterprise Agreement proposal PPTX.
 
 Pricing is sourced from EAMP Price Estimate ID 9325586 (indicative only;
-not an approved Cisco quote).
+not an approved Cisco quote). Customer-facing figures include 22.5 points
+of partner gross margin on Cisco EA net (sell = net / 0.775).
 """
 
 from __future__ import annotations
@@ -38,6 +39,20 @@ SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+
+# 22.5 points of gross margin on Cisco EA net (not a 22.5% markup).
+# Hallmark price = Cisco net / (1 - 0.225) = Cisco net / 0.775
+MARGIN_PTS = 22.5
+MARGIN = MARGIN_PTS / 100.0
+
+
+def sell(cisco_net: float) -> float:
+    """Customer / partner sell price at 22.5 pts GM."""
+    return cisco_net / (1.0 - MARGIN)
+
+
+def gm_dollars(cisco_net: float) -> float:
+    return sell(cisco_net) - cisco_net
 
 
 def money(n: float, cents: bool = True) -> str:
@@ -186,7 +201,7 @@ def footer(slide, page, total, confidential=True):
         Inches(7.28),
         Inches(8.5),
         Inches(0.22),
-        "CISCO CONFIDENTIAL  |  Indicative pricing as of 08-Sep-2026  |  Not an approved Cisco quote",
+        "CISCO CONFIDENTIAL  |  Indicative  ·  22.5 pts GM on Cisco EA net  |  Not an approved Cisco quote",
         size=9,
         color=WHITE,
         anchor=MSO_ANCHOR.MIDDLE,
@@ -241,7 +256,7 @@ def bullet_block(slide, l, t, w, h, items, size=14, color=INK, spacing=True):
 # Slide builders
 # ---------------------------------------------------------------------------
 
-TOTAL_SLIDES = 18
+TOTAL_SLIDES = 19
 
 
 def s01_title(prs):
@@ -256,7 +271,7 @@ def s01_title(prs):
     facts = [
         ("TERM", "36 months"),
         ("BILLING", "Annual"),
-        ("NET TCV", "$3.15M"),
+        ("HALLMARK TCV", "$4.06M"),
         ("BOOK DATE", "16 Oct 2026"),
     ]
     for i, (k, v) in enumerate(facts):
@@ -281,7 +296,7 @@ def s01_title(prs):
         Inches(6.55),
         Inches(12),
         Inches(0.45),
-        "CISCO CONFIDENTIAL  ·  Indicative pricing only as of 08-Sep-2026  ·  This is not an approved Cisco quote",
+        "CISCO CONFIDENTIAL  ·  Indicative  ·  22.5 pts partner GM on Cisco EA net  ·  Not an approved Cisco quote",
         11,
         False,
         GOLD,
@@ -295,9 +310,9 @@ def s02_agenda(prs):
     header_bar(s, "Hallmark CX EA", "Agenda")
     items = [
         ("01", "Deal snapshot & commercial terms", "Who, what, when, and how this EA is structured"),
-        ("02", "Investment summary", "Net TCV, software vs. services, and savings versus list"),
+        ("02", "Investment with 22.5 pts margin", "Cisco EA net, partner GM, Hallmark price vs. list"),
         ("03", "Portfolio architecture", "Networking, Applications, Security, and Collaboration CX"),
-        ("04", "Bill of materials", "Suite commitments, quantities, and contract value"),
+        ("04", "Bill of materials", "Suite commitments, quantities, and Hallmark TCV"),
         ("05", "EA operating model & next steps", "True-forward, annual billing, and path to book"),
     ]
     for i, (num, title, desc) in enumerate(items):
@@ -329,6 +344,7 @@ def s03_snapshot(prs):
         ("Price list", "Global Price List US Availability"),
         ("Requested ship / book", "16 October 2026"),
         ("Duration / billing", "36 months  ·  Annual billing  ·  No capital financing"),
+        ("Customer pricing", "Cisco EA net + 22.5 pts partner gross margin  ·  Hallmark TCV $4.06M"),
     ]
     table = add_table(s, len(rows) + 1, 2, Inches(0.45), Inches(1.42), Inches(12.4), Inches(5.55))
     set_col_widths(table, [Inches(3.4), Inches(9.0)])
@@ -368,21 +384,71 @@ def s04_why_ea(prs):
     return s
 
 
+def s05_margin(prs):
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
+    header_bar(
+        s,
+        "Commercial wrap",
+        "22.5 points of partner margin",
+        "Gross margin on Cisco EA net  ·  Hallmark price = Cisco net ÷ 0.775  ·  Applied to every line in this deck",
+    )
+
+    cisco = 3146589.96
+    hallmark = sell(cisco)
+    margin = gm_dollars(cisco)
+
+    cards = [
+        ("CISCO EA NET", money_short(cisco), money(cisco), BLUE),
+        ("PARTNER GM", "22.5 pts", money(margin) + "  ·  29.0% markup", GOLD),
+        ("HALLMARK PRICE", money_short(hallmark), money(hallmark), GOLD),
+        ("VS. CISCO LIST", "41.9% off", "List $6.99M  ·  Save $2.93M", GREEN),
+    ]
+    for i, (lab, val, cap, acc) in enumerate(cards):
+        kpi_card(s, Inches(0.40) + Inches(i * 3.20), Inches(1.42), Inches(3.05), Inches(1.22), lab, val, cap, acc)
+
+    headers = ["PORTFOLIO", "CISCO EA NET", "22.5 PTS GM", "HALLMARK PRICE"]
+    data = [
+        ["Networking software", money(1030043.52), money(gm_dollars(1030043.52)), money(sell(1030043.52))],
+        ["Applications software", money(437058.00), money(gm_dollars(437058.00)), money(sell(437058.00))],
+        ["Security software", money(76726.68), money(gm_dollars(76726.68)), money(sell(76726.68))],
+        ["CX services (all)", money(1602761.76), money(gm_dollars(1602761.76)), money(sell(1602761.76))],
+        ["TOTAL", money(cisco), money(margin), money(hallmark)],
+    ]
+    table = add_table(s, 6, 4, Inches(0.45), Inches(2.88), Inches(12.4), Inches(2.85))
+    set_col_widths(table, [Inches(3.40), Inches(3.00), Inches(3.00), Inches(3.00)])
+    aligns = [PP_ALIGN.LEFT] + [PP_ALIGN.RIGHT] * 3
+    fill_table(table, headers, data, col_align=aligns, header_size=12, body_size=13)
+
+    add_textbox(
+        s,
+        Inches(0.50),
+        Inches(5.90),
+        Inches(12.3),
+        Inches(1.05),
+        "All software and services TCV figures from this slide forward are Hallmark (sell) prices. Cisco list, subscription-discount %, IB credits, and one-time discounts are unchanged from the EAMP export — only the customer-facing contract value includes the 22.5-point wrap. True-forward of additional quantity will use the same margin method.",
+        13,
+        False,
+        MUTED,
+    )
+    footer(s, 5, TOTAL_SLIDES)
+    return s
+
+
 def s05_investment(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Investment summary", "Net 3-year contract value", "Financial Summary (Net Pricing) from EAMP export — USD")
+    header_bar(s, "Investment summary", "Hallmark 3-year contract value", "Includes 22.5 pts partner GM on Cisco EA net  ·  USD")
 
     kpis = [
-        ("3-YEAR NET TCV", "$3.15M", "USD 3,146,589.96"),
-        ("SOFTWARE", "$1.54M", "49% of net TCV"),
-        ("CISCO CX SERVICES", "$1.60M", "51% of net TCV"),
-        ("VS. LIST", "55% off", "List $6.99M  ·  Save $3.84M"),
+        ("3-YEAR HALLMARK TCV", "$4.06M", money(sell(3146589.96))),
+        ("SOFTWARE", "$1.99M", "49% of Hallmark TCV"),
+        ("CISCO CX SERVICES", "$2.07M", "51% of Hallmark TCV"),
+        ("VS. LIST", "42% off", "List $6.99M  ·  Save $2.93M"),
     ]
     for i, (lab, val, cap) in enumerate(kpis):
         kpi_card(s, Inches(0.40) + Inches(i * 3.20), Inches(1.45), Inches(3.05), Inches(1.22), lab, val, cap, GOLD if i == 0 else BLUE)
 
-    # Two columns of narrative
     add_round(s, Inches(0.40), Inches(2.90), Inches(6.20), Inches(4.05), WHITE)
     add_textbox(s, Inches(0.65), Inches(3.05), Inches(5.8), Inches(0.35), "How the investment is built", 16, True, NAVY)
     bullet_block(
@@ -392,10 +458,10 @@ def s05_investment(prs):
         Inches(5.8),
         Inches(3.30),
         [
-            "Networking software is the largest software block at $1.03M net (Catalyst DNA, Nexus, Meraki, Spaces).",
-            "Applications add Splunk Cloud (50 GB/day) and ThousandEyes (1,500 agents + 1,500 EUM users) for $437K.",
-            "Security is ISE Advantage (3,450) and Essentials (1,100) at $77K software plus $115K CX.",
-            "CX services ($1.60M) cover switching, wireless, Nexus, ISE, and Collaboration hardware support.",
+            f"Networking software is the largest software block at {money_short(sell(1030043.52))} (Catalyst DNA, Nexus, Meraki, Spaces).",
+            f"Applications add Splunk Cloud (50 GB/day) and ThousandEyes (1,500 agents + 1,500 EUM users) for {money_short(sell(437058.00))}.",
+            f"Security is ISE Advantage (3,450) and Essentials (1,100) at {money_short(sell(76726.68))} software plus {money_short(sell(115233.48))} CX.",
+            f"CX services ({money_short(sell(1602761.76))}) cover switching, wireless, Nexus, ISE, and Collaboration hardware support.",
         ],
         size=13,
     )
@@ -403,12 +469,12 @@ def s05_investment(prs):
     add_round(s, Inches(6.80), Inches(2.90), Inches(6.10), Inches(4.05), WHITE)
     add_textbox(s, Inches(7.05), Inches(3.05), Inches(5.7), Inches(0.35), "Commercial mechanics", 16, True, NAVY)
     rows = [
-        ("Annual payment (even)", "$1,048,863"),
-        ("Implied monthly", "$87,405"),
-        ("Subscription discount", "Up to 68% (Networking)"),
-        ("Programmatic discount", "5–10% by suite"),
-        ("One-time discounts", "$475,060"),
-        ("IB / uncovered credits", "Applied on CX + software"),
+        ("Annual payment (even)", money(sell(3146589.96) / 3, cents=False)),
+        ("Implied monthly", money(sell(3146589.96) / 36, cents=False)),
+        ("Partner margin", "22.5 pts GM  ($913,526)"),
+        ("Subscription discount", "Up to 68% (Networking, Cisco net)"),
+        ("Programmatic discount", "5–10% by suite (Cisco net)"),
+        ("One-time discounts", "$475,060  (Cisco net, already in)"),
         ("Billing model", "Annual, 36 months"),
         ("Financing", "None (cash / standard)"),
     ]
@@ -420,27 +486,27 @@ def s05_investment(prs):
         fill = ROW_ALT if i % 2 == 0 else ROW_WHITE
         style_cell(table.cell(i, 0), k, 11, False, INK, fill)
         style_cell(table.cell(i, 1), v, 11, True, NAVY, fill, align=PP_ALIGN.RIGHT)
-    footer(s, 5, TOTAL_SLIDES)
+    footer(s, 6, TOTAL_SLIDES)
     return s
 
 
 def s06_financials(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Financial summary", "Portfolio net pricing (USD)", "Software and services as reported on the Proposal Summary sheet")
+    header_bar(s, "Financial summary", "Portfolio Hallmark pricing (USD)", "Cisco EA net + 22.5 pts GM  ·  List prices unchanged from EAMP")
 
-    headers = ["PORTFOLIO", "SOFTWARE", "SERVICES", "NET TCV", "LIST PRICE", "DISCOUNT", "ONE-TIME"]
+    headers = ["PORTFOLIO", "SOFTWARE", "SERVICES", "HALLMARK TCV", "CISCO NET", "LIST PRICE"]
     data = [
-        ["Networking Infrastructure", "$1,030,043.52", "$0.00*", "$1,030,043.52", "$3,252,177.72", "$2,211,543.72", "$10,590.48"],
-        ["Applications Infrastructure", "$437,058.00", "$0.00", "$437,058.00", "$650,862.00", "$213,804.00", "$0.00"],
-        ["Security", "$76,726.68", "$0.00*", "$76,726.68", "$136,243.50", "$57,226.50", "$2,290.32"],
-        ["Services (CX rollup)", "$0.00", "$1,602,761.76", "$1,602,761.76", "$2,948,542.56", "$883,601.88", "$462,179.16"],
-        ["TOTAL", "$1,543,828.20", "$1,602,761.76", "$3,146,589.96", "$6,987,825.78", "$3,366,176.10", "$475,059.96"],
+        ["Networking Infrastructure", money(sell(1030043.52)), "$0.00*", money(sell(1030043.52)), money(1030043.52), "$3,252,177.72"],
+        ["Applications Infrastructure", money(sell(437058.00)), "$0.00", money(sell(437058.00)), money(437058.00), "$650,862.00"],
+        ["Security", money(sell(76726.68)), "$0.00*", money(sell(76726.68)), money(76726.68), "$136,243.50"],
+        ["Services (CX rollup)", "$0.00", money(sell(1602761.76)), money(sell(1602761.76)), money(1602761.76), "$2,948,542.56"],
+        ["TOTAL", money(sell(1543828.20)), money(sell(1602761.76)), money(sell(3146589.96)), money(3146589.96), "$6,987,825.78"],
     ]
-    table = add_table(s, 6, 7, Inches(0.30), Inches(1.45), Inches(12.7), Inches(3.15))
-    widths = [Inches(2.70), Inches(1.70), Inches(1.70), Inches(1.75), Inches(1.70), Inches(1.60), Inches(1.55)]
+    table = add_table(s, 6, 6, Inches(0.28), Inches(1.45), Inches(12.75), Inches(3.15))
+    widths = [Inches(2.85), Inches(1.95), Inches(1.95), Inches(2.15), Inches(1.90), Inches(1.95)]
     set_col_widths(table, widths)
-    aligns = [PP_ALIGN.LEFT] + [PP_ALIGN.RIGHT] * 6
+    aligns = [PP_ALIGN.LEFT] + [PP_ALIGN.RIGHT] * 5
     fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=11)
 
     add_textbox(
@@ -449,17 +515,22 @@ def s06_financials(prs):
         Inches(4.75),
         Inches(12.5),
         Inches(0.35),
-        "* Proposal Summary shows CX under the Services row. Portfolio sheets break those services out: Networking CX $1,127,847  ·  Security CX $115,233  ·  Collaboration CX $359,682.",
+        "* CX is rolled up on the Services row. Hallmark CX: Networking "
+        + money(sell(1127846.52), cents=False)
+        + "  ·  Security "
+        + money(sell(115233.48), cents=False)
+        + "  ·  Collaboration "
+        + money(sell(359681.76), cents=False)
+        + ".",
         11,
         False,
         MUTED,
     )
 
-    # Three insight chips
     chips = [
-        ("Effective discount", "54.97%", "List $6.99M → net $3.15M"),
-        ("Software mix", "49 / 51", "Software $1.54M  ·  CX $1.60M"),
-        ("Largest lever", "Networking", "Catalyst + Nexus + Meraki + CX"),
+        ("Effective discount", "41.9%", "List $6.99M → Hallmark $4.06M"),
+        ("Software mix", "49 / 51", f"SW {money_short(sell(1543828.20))}  ·  CX {money_short(sell(1602761.76))}"),
+        ("Partner wrap", "22.5 pts", f"GM {money_short(gm_dollars(3146589.96))} on Cisco net"),
     ]
     for i, (lab, val, cap) in enumerate(chips):
         x = Inches(0.40) + Inches(i * 4.25)
@@ -467,26 +538,24 @@ def s06_financials(prs):
         add_textbox(s, x + Inches(0.20), Inches(5.35), Inches(3.65), Inches(0.28), lab.upper(), 11, True, MUTED)
         add_textbox(s, x + Inches(0.20), Inches(5.62), Inches(3.65), Inches(0.50), val, 26, True, NAVY)
         add_textbox(s, x + Inches(0.20), Inches(6.18), Inches(3.65), Inches(0.45), cap, 12, False, MUTED)
-    footer(s, 6, TOTAL_SLIDES)
+    footer(s, 7, TOTAL_SLIDES)
     return s
 
 
 def s07_mix(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Where the investment goes", "Net TCV by portfolio (software + attached CX)", "CX from each portfolio sheet is shown with its parent technology")
+    header_bar(s, "Where the investment goes", "Hallmark TCV by portfolio (software + attached CX)", "CX from each portfolio sheet is shown with its parent technology  ·  22.5 pts GM included")
 
-    # Combined portfolio TCV including attached services
     blocks = [
-        ("Networking", 1030043.52 + 1127846.52, "Software $1.03M\nCX $1.13M", NAVY),
-        ("Collaboration CX", 359681.76, "Support only\nno new collab SW", BLUE),
-        ("Applications", 437058.00, "Splunk + ThousandEyes", CYAN),
-        ("Security", 76726.68 + 115233.48, "ISE software\n+ ISE CX", GOLD),
+        ("Networking", sell(1030043.52 + 1127846.52), f"Software {money_short(sell(1030043.52))}\nCX {money_short(sell(1127846.52))}", NAVY),
+        ("Collaboration CX", sell(359681.76), "Support only\nno new collab SW", BLUE),
+        ("Applications", sell(437058.00), "Splunk + ThousandEyes", CYAN),
+        ("Security", sell(76726.68 + 115233.48), "ISE software\n+ ISE CX", GOLD),
     ]
-    total = 3146589.96
-    # visual bars
+    total = sell(3146589.96)
     max_w = Inches(8.6)
-    add_textbox(s, Inches(0.45), Inches(1.40), Inches(12), Inches(0.30), "Relative scale of 3-year net contract value", 12, True, MUTED)
+    add_textbox(s, Inches(0.45), Inches(1.40), Inches(12), Inches(0.30), "Relative scale of 3-year Hallmark contract value", 12, True, MUTED)
     for i, (name, val, cap, color) in enumerate(blocks):
         y = Inches(1.80) + Inches(i * 1.15)
         add_textbox(s, Inches(0.45), y, Inches(2.35), Inches(0.85), name, 14, True, NAVY, anchor=MSO_ANCHOR.MIDDLE)
@@ -495,10 +564,9 @@ def s07_mix(prs):
         add_textbox(s, Inches(2.90) + bar_w + Inches(0.12), y, Inches(2.4), Inches(0.48), money_short(val), 16, True, NAVY, anchor=MSO_ANCHOR.MIDDLE)
         add_textbox(s, Inches(2.90), y + Inches(0.58), Inches(8.5), Inches(0.35), cap.replace("\n", "  ·  "), 11, False, MUTED)
 
-    # right side total card
     add_round(s, Inches(10.55), Inches(1.80), Inches(2.40), Inches(4.70), NAVY)
-    add_textbox(s, Inches(10.70), Inches(2.10), Inches(2.10), Inches(0.30), "NET TCV", 11, True, GOLD)
-    add_textbox(s, Inches(10.70), Inches(2.45), Inches(2.10), Inches(0.90), "$3.15M", 26, True, WHITE)
+    add_textbox(s, Inches(10.70), Inches(2.10), Inches(2.10), Inches(0.30), "HALLMARK TCV", 11, True, GOLD)
+    add_textbox(s, Inches(10.70), Inches(2.45), Inches(2.10), Inches(0.90), "$4.06M", 26, True, WHITE)
     add_textbox(
         s,
         Inches(10.70),
@@ -510,85 +578,56 @@ def s07_mix(prs):
         False,
         CYAN,
     )
-    footer(s, 7, TOTAL_SLIDES)
+    footer(s, 8, TOTAL_SLIDES)
     return s
 
 
 def s08_networking_overview(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Networking Infrastructure", "Campus, data center, Meraki, and Spaces", "Software TCV $1,030,044  ·  CX TCV $1,127,847  ·  36 months  ·  Full commitment unless noted")
+    header_bar(s, "Networking Infrastructure", "Campus, data center, Meraki, and Spaces", f"Software {money(sell(1030043.52), cents=False)}  ·  CX {money(sell(1127846.52), cents=False)}  ·  36 months  ·  22.5 pts GM included")
 
     headers = ["SUITE", "COMMIT", "KEY ENTITLEMENT", "QTY", "SW TCV"]
     data = [
-        ["Meraki – Network Infrastructure", "Full", "MX XL Essentials, MR, MS100/MS300", "216", "$45,702"],
-        ["Meraki – Camera Systems", "Partial", "MV Large Essentials", "2", "$415"],
-        ["Cisco Networking Wireless", "Full", "CW Advantage + Essential", "2", "$380"],
-        ["Cisco Networking Switching", "Full", "Access T1 Large/Medium Essential", "91", "$57,330"],
-        ["Nexus Switching", "Full", "N9300 XF/XF2 Advantage + Essential", "36", "$304,670"],
-        ["Cisco Spaces (wireless add-on)", "Partial", "Spaces ACT subscription", "350", "$64,638"],
-        ["Cisco DNA Switching", "Full", "C3850/C9300/C9500/C9200 DNA", "298", "$449,547"],
-        ["Cisco DNA Wireless", "Full", "DNA Wireless Advantage", "525", "$107,361"],
-        ["TOTAL SOFTWARE", "", "", "", "$1,030,044"],
+        ["Meraki – Network Infrastructure", "Full", "MX XL Essentials, MR, MS100/MS300", "216", money(sell(17494.92+23344.56+342.36+529.20+518.40+1458.72+2014.20), cents=False)],
+        ["Meraki – Camera Systems", "Partial", "MV Large Essentials", "2", money(sell(414.72), cents=False)],
+        ["Cisco Networking Wireless", "Full", "CW Advantage + Essential", "2", money(sell(380.16), cents=False)],
+        ["Cisco Networking Switching", "Full", "Access T1 Large/Medium Essential", "91", money(sell(57330.00), cents=False)],
+        ["Nexus Switching", "Full", "N9300 XF/XF2 Advantage + Essential", "36", money(sell(304670.16), cents=False)],
+        ["Cisco Spaces (wireless add-on)", "Partial", "Spaces ACT subscription", "350", money(sell(64638.00), cents=False)],
+        ["Cisco DNA Switching", "Full", "C3850/C9300/C9500/C9200 DNA", "298", money(sell(449546.76), cents=False)],
+        ["Cisco DNA Wireless", "Full", "DNA Wireless Advantage", "525", money(sell(107361.36), cents=False)],
+        ["TOTAL SOFTWARE", "", "", "", money(sell(1030043.52), cents=False)],
     ]
     table = add_table(s, 10, 5, Inches(0.35), Inches(1.42), Inches(12.6), Inches(5.50))
     set_col_widths(table, [Inches(3.55), Inches(1.20), Inches(4.35), Inches(1.15), Inches(2.35)])
     aligns = [PP_ALIGN.LEFT, PP_ALIGN.CENTER, PP_ALIGN.LEFT, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT]
     fill_table(table, headers, data, col_align=aligns, header_size=11, body_size=12)
-    footer(s, 8, TOTAL_SLIDES)
+    footer(s, 9, TOTAL_SLIDES)
     return s
 
 
 def s09_networking_bom(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Networking software — detail 1 of 2", "Meraki, Catalyst Networking, and Nexus", "Qty Found = installed base  ·  Qty Desired = EA quantity  ·  68% subscription discount on most PIDs")
+    header_bar(s, "Networking software — detail 1 of 2", "Meraki, Catalyst Networking, and Nexus", "Hallmark TCV includes 22.5 pts GM  ·  Qty Found = IB  ·  68% Cisco subscription discount on most PIDs")
 
-    headers = ["PID", "DESCRIPTION", "TIER", "IB", "QTY", "NET TCV"]
+    headers = ["PID", "DESCRIPTION", "TIER", "IB", "QTY", "HALLMARK TCV"]
     data = [
-        ["E3N-MX-XL-E", "Meraki MX X-Large Essentials", "—", "2", "3", "$17,495"],
-        ["E3N-MR-E", "Meraki MR Essentials", "—", "77", "193", "$23,345"],
-        ["E3N-MS-100-S/M/L-E", "Meraki MS100 Small/Med/Large Essentials", "—", "0", "16", "$1,390"],
-        ["E3N-MS-300-M/L-A", "Meraki MS300 Medium/Large Advantage", "Adv", "4", "4", "$3,473"],
-        ["E3N-MV-E", "Meraki MV Large Essentials", "—", "0", "2", "$415"],
-        ["E3N-CW-A / E3N-CW-E", "Cisco Networking Wireless", "Adv/Ess", "0", "2", "$380"],
-        ["E3N-CS-AC1-L-E", "Switching Access T1 Large Essential", "Ess", "0", "49", "$39,126"],
-        ["E3N-CS-AC1-M-E", "Switching Access T1 Medium Essential", "Ess", "0", "42", "$18,204"],
-        ["E3N-N9300-XF2-A", "Nexus 9300 XF2 or higher (to 6.4T)", "Adv", "2", "2", "$35,440"],
-        ["E3N-N9300-XF-A", "Nexus 9300 XF 10G+ (to 3.6T)", "Adv", "22", "30", "$243,119"],
-        ["E3N-N9300-XF-E", "Nexus 9300 XF 10G+ (to 3.6T)", "Ess", "0", "4", "$26,112"],
-        ["E3N-SPACES-ACT", "Cisco Spaces ACT subscription", "Add-on", "0", "350", "$64,638"],
+        ["E3N-MX-XL-E", "Meraki MX X-Large Essentials", "—", "2", "3", money(sell(17494.92), cents=False)],
+        ["E3N-MR-E", "Meraki MR Essentials", "—", "77", "193", money(sell(23344.56), cents=False)],
+        ["E3N-MS-100-S/M/L-E", "Meraki MS100 Small/Med/Large Essentials", "—", "0", "16", money(sell(1389.96), cents=False)],
+        ["E3N-MS-300-M/L-A", "Meraki MS300 Medium/Large Advantage", "Adv", "4", "4", money(sell(3472.92), cents=False)],
+        ["E3N-MV-E", "Meraki MV Large Essentials", "—", "0", "2", money(sell(414.72), cents=False)],
+        ["E3N-CW-A / E3N-CW-E", "Cisco Networking Wireless", "Adv/Ess", "0", "2", money(sell(380.16), cents=False)],
+        ["E3N-CS-AC1-L-E", "Switching Access T1 Large Essential", "Ess", "0", "49", money(sell(39125.52), cents=False)],
+        ["E3N-CS-AC1-M-E", "Switching Access T1 Medium Essential", "Ess", "0", "42", money(sell(18204.48), cents=False)],
+        ["E3N-N9300-XF2-A", "Nexus 9300 XF2 or higher (to 6.4T)", "Adv", "2", "2", money(sell(35439.84), cents=False)],
+        ["E3N-N9300-XF-A", "Nexus 9300 XF 10G+ (to 3.6T)", "Adv", "22", "30", money(sell(243118.80), cents=False)],
+        ["E3N-N9300-XF-E", "Nexus 9300 XF 10G+ (to 3.6T)", "Ess", "0", "4", money(sell(26111.52), cents=False)],
+        ["E3N-SPACES-ACT", "Cisco Spaces ACT subscription", "Add-on", "0", "350", money(sell(64638.00), cents=False)],
     ]
     table = add_table(s, 13, 6, Inches(0.30), Inches(1.40), Inches(12.7), Inches(5.55))
-    set_col_widths(table, [Inches(2.45), Inches(4.55), Inches(1.15), Inches(0.85), Inches(0.95), Inches(1.75)])
-    aligns = [PP_ALIGN.LEFT, PP_ALIGN.LEFT, PP_ALIGN.CENTER, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT]
-    fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=11)
-    footer(s, 9, TOTAL_SLIDES)
-    return s
-
-
-def s10_networking_dna(prs):
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Networking software — detail 2 of 2", "Cisco DNA Switching and Wireless", "Full-commitment DNA suites  ·  C3850 48-port Advantage is the single largest software PID")
-
-    headers = ["PID", "DESCRIPTION", "TIER", "IB", "QTY", "NET TCV"]
-    data = [
-        ["E3N-C38502-A", "C3850 48-Port DNA EA", "Adv", "0", "218", "$306,464"],
-        ["E3N-C95005-A", "C9500 48Y4C DNA EA", "Adv", "43", "16", "$70,791"],
-        ["E3N-C93002-A", "C9300/C9300X 48-Port DNA EA", "Adv", "43", "19", "$26,619"],
-        ["E3N-C95003-A", "C9500 32C DNA EA", "Adv", "4", "4", "$18,048"],
-        ["E3N-C9200CX2-A", "C9200CX 12-Port DNA EA", "Adv", "24", "18", "$6,690"],
-        ["E3N-C36502-A", "C3650 48-Port DNA EA", "Adv", "0", "4", "$5,623"],
-        ["E3N-C9300X2-A", "C9300X 24-Port DNA EA", "Adv", "6", "6", "$4,497"],
-        ["E3N-C95002-A", "C9500 Low Port (12Q/16X) DNA EA", "Adv", "0", "2", "$5,296"],
-        ["E3N-C38501-A", "C3850 24-Port DNA EA", "Adv", "0", "3", "$2,249"],
-        ["E3N-C95005-E", "C9500 48Y4C DNA EA", "Ess", "3", "3", "$1,863"],
-        ["E3N-C93001-A / others", "C9300 24 / C3560CX / C9200L 48", "Mix", "18", "7", "$1,407"],
-        ["E3N-AIRWLAN-A", "Cisco DNA Wireless", "Adv", "132", "525", "$107,361"],
-        ["TOTAL DNA + WIRELESS", "", "", "", "", "$556,908"],
-    ]
-    table = add_table(s, 14, 6, Inches(0.30), Inches(1.40), Inches(12.7), Inches(5.55))
     set_col_widths(table, [Inches(2.45), Inches(4.55), Inches(1.15), Inches(0.85), Inches(0.95), Inches(1.75)])
     aligns = [PP_ALIGN.LEFT, PP_ALIGN.LEFT, PP_ALIGN.CENTER, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT]
     fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=11)
@@ -596,58 +635,86 @@ def s10_networking_dna(prs):
     return s
 
 
+def s10_networking_dna(prs):
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
+    header_bar(s, "Networking software — detail 2 of 2", "Cisco DNA Switching and Wireless", "Hallmark TCV includes 22.5 pts GM  ·  C3850 48-port Advantage is the single largest software PID")
+
+    headers = ["PID", "DESCRIPTION", "TIER", "IB", "QTY", "HALLMARK TCV"]
+    data = [
+        ["E3N-C38502-A", "C3850 48-Port DNA EA", "Adv", "0", "218", money(sell(306464.40), cents=False)],
+        ["E3N-C95005-A", "C9500 48Y4C DNA EA", "Adv", "43", "16", money(sell(70791.12), cents=False)],
+        ["E3N-C93002-A", "C9300/C9300X 48-Port DNA EA", "Adv", "43", "19", money(sell(26619.12), cents=False)],
+        ["E3N-C95003-A", "C9500 32C DNA EA", "Adv", "4", "4", money(sell(18047.52), cents=False)],
+        ["E3N-C9200CX2-A", "C9200CX 12-Port DNA EA", "Adv", "24", "18", money(sell(6690.24), cents=False)],
+        ["E3N-C36502-A", "C3650 48-Port DNA EA", "Adv", "0", "4", money(sell(5623.20), cents=False)],
+        ["E3N-C9300X2-A", "C9300X 24-Port DNA EA", "Adv", "6", "6", money(sell(4497.12), cents=False)],
+        ["E3N-C95002-A", "C9500 Low Port (12Q/16X) DNA EA", "Adv", "0", "2", money(sell(5295.60), cents=False)],
+        ["E3N-C38501-A", "C3850 24-Port DNA EA", "Adv", "0", "3", money(sell(2248.56), cents=False)],
+        ["E3N-C95005-E", "C9500 48Y4C DNA EA", "Ess", "3", "3", money(sell(1863.00), cents=False)],
+        ["E3N-C93001-A / others", "C9300 24 / C3560CX / C9200L 48", "Mix", "18", "7", money(sell(1406.88), cents=False)],
+        ["E3N-AIRWLAN-A", "Cisco DNA Wireless", "Adv", "132", "525", money(sell(107361.36), cents=False)],
+        ["TOTAL DNA + WIRELESS", "", "", "", "", money(sell(449546.76 + 107361.36), cents=False)],
+    ]
+    table = add_table(s, 14, 6, Inches(0.30), Inches(1.40), Inches(12.7), Inches(5.55))
+    set_col_widths(table, [Inches(2.45), Inches(4.55), Inches(1.15), Inches(0.85), Inches(0.95), Inches(1.75)])
+    aligns = [PP_ALIGN.LEFT, PP_ALIGN.LEFT, PP_ALIGN.CENTER, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT]
+    fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=11)
+    footer(s, 11, TOTAL_SLIDES)
+    return s
+
+
 def s11_networking_cx(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Networking CX", "Support & lifecycle services", "Portfolio services TCV $1,127,847  ·  Cisco Support Standard unless noted Enhanced")
+    header_bar(s, "Networking CX", "Support & lifecycle services", f"Hallmark CX {money(sell(1127846.52), cents=False)}  ·  Cisco Support Standard unless noted Enhanced  ·  22.5 pts GM")
 
-    headers = ["PID", "COVERAGE", "IB ASSETS", "DISC %", "NET TCV"]
+    headers = ["PID", "COVERAGE", "IB ASSETS", "DISC %", "HALLMARK TCV"]
     data = [
-        ["E3-CX-ST-T1NBD", "Switching  8x5xNBD", "120", "35%", "$385,433"],
-        ["E3-CX-ST-T1NCD", "Switching  8x7xNCD", "1,053", "35%", "$246,936"],
-        ["E3-CX-ST-T1SWT", "Switching  software support", "—", "35%", "$138,048"],
-        ["E3-CX-CS-ENBD", "Cisco Switching  8x5xNBD", "91", "23%", "$81,638"],
-        ["E3-CX-DCN-T14HR", "Nexus  24x7x4", "10", "21%", "$83,260"],
-        ["E3-CX-ST-T14HR", "Switching  24x7x4", "7", "35%", "$57,020"],
-        ["E3-CXST-AIR-T1SWP", "Wireless  software support", "—", "35%", "$33,114"],
-        ["E3-CX-DCN-L1SWPERP", "Nexus  perpetual", "24", "22%", "$27,504"],
-        ["E3-CX-DCN-T1NBD", "Nexus  8x5xNBD", "26", "30%", "$23,171"],
-        ["E3-CX-DNS-T1SWC", "Spaces / DNAS cloud SW (Enhanced)", "—", "35%", "$19,705"],
-        ["E3-CX-DCN-T1NCD", "Nexus  8x7xNCD", "16", "23%", "$15,612"],
-        ["E3-CX-ST-T1NOS", "Switching  8x5xNBD OS", "7", "35%", "$12,789"],
-        ["E3-CX-CW-ENCD", "Cisco Wireless  8x7xNCD", "16", "31%", "$3,615"],
-        ["TOTAL NETWORKING CX", "", "", "", "$1,127,847"],
+        ["E3-CX-ST-T1NBD", "Switching  8x5xNBD", "120", "35%", money(sell(385433.28), cents=False)],
+        ["E3-CX-ST-T1NCD", "Switching  8x7xNCD", "1,053", "35%", money(sell(246936.24), cents=False)],
+        ["E3-CX-ST-T1SWT", "Switching  software support", "—", "35%", money(sell(138047.76), cents=False)],
+        ["E3-CX-CS-ENBD", "Cisco Switching  8x5xNBD", "91", "23%", money(sell(81637.56), cents=False)],
+        ["E3-CX-DCN-T14HR", "Nexus  24x7x4", "10", "21%", money(sell(83260.08), cents=False)],
+        ["E3-CX-ST-T14HR", "Switching  24x7x4", "7", "35%", money(sell(57020.40), cents=False)],
+        ["E3-CXST-AIR-T1SWP", "Wireless  software support", "—", "35%", money(sell(33114.24), cents=False)],
+        ["E3-CX-DCN-L1SWPERP", "Nexus  perpetual", "24", "22%", money(sell(27504.00), cents=False)],
+        ["E3-CX-DCN-T1NBD", "Nexus  8x5xNBD", "26", "30%", money(sell(23171.40), cents=False)],
+        ["E3-CX-DNS-T1SWC", "Spaces / DNAS cloud SW (Enhanced)", "—", "35%", money(sell(19705.32), cents=False)],
+        ["E3-CX-DCN-T1NCD", "Nexus  8x7xNCD", "16", "23%", money(sell(15612.12), cents=False)],
+        ["E3-CX-ST-T1NOS", "Switching  8x5xNBD OS", "7", "35%", money(sell(12789.00), cents=False)],
+        ["E3-CX-CW-ENCD", "Cisco Wireless  8x7xNCD", "16", "31%", money(sell(3615.12), cents=False)],
+        ["TOTAL NETWORKING CX", "", "", "", money(sell(1127846.52), cents=False)],
     ]
     table = add_table(s, 15, 5, Inches(0.35), Inches(1.40), Inches(12.6), Inches(5.55))
     set_col_widths(table, [Inches(2.70), Inches(4.40), Inches(1.55), Inches(1.30), Inches(2.65)])
     aligns = [PP_ALIGN.LEFT, PP_ALIGN.LEFT, PP_ALIGN.RIGHT, PP_ALIGN.CENTER, PP_ALIGN.RIGHT]
     fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=11)
-    footer(s, 11, TOTAL_SLIDES)
+    footer(s, 12, TOTAL_SLIDES)
     return s
 
 
 def s12_apps(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Applications Infrastructure", "Splunk Cloud and ThousandEyes", "Software TCV $437,058  ·  No attached CX on this portfolio  ·  Full commitment  ·  5% programmatic")
+    header_bar(s, "Applications Infrastructure", "Splunk Cloud and ThousandEyes", f"Hallmark TCV {money(sell(437058.00), cents=False)}  ·  No attached CX  ·  Full commitment  ·  22.5 pts GM")
 
-    # KPI row
     for i, (lab, val, cap, acc) in enumerate([
-        ("PORTFOLIO TCV", "$437,058", "100% software", GOLD),
-        ("SPLUNK CLOUD", "$90,918", "50 GB/day  ·  42% sub disc.", BLUE),
-        ("THOUSANDEYES", "$346,140", "Agents + EUM  ·  30% sub disc.", CYAN),
+        ("PORTFOLIO TCV", money(sell(437058.00), cents=False), "100% software", GOLD),
+        ("SPLUNK CLOUD", money(sell(90918.00), cents=False), "50 GB/day  ·  42% Cisco sub disc.", BLUE),
+        ("THOUSANDEYES", money(sell(346140.00), cents=False), "Agents + EUM  ·  30% Cisco sub disc.", CYAN),
         ("SUCCESS PLAN", "Included", "Splunk Standard Success", GREEN),
     ]):
         kpi_card(s, Inches(0.40) + Inches(i * 3.20), Inches(1.42), Inches(3.05), Inches(1.22), lab, val, cap, acc)
 
-    headers = ["PID", "DESCRIPTION", "QTY", "UNIT LIST / MO", "SUB DISC.", "NET TCV"]
+    headers = ["PID", "DESCRIPTION", "QTY", "UNIT LIST / MO", "SUB DISC.", "HALLMARK TCV"]
     data = [
-        ["E3A-SK-SE-CLD-S", "Splunk Cloud Subscription — Std success (GB/day)", "50", "$87.09", "42%", "$90,918"],
+        ["E3A-SK-SE-CLD-S", "Splunk Cloud Subscription — Std success (GB/day)", "50", "$87.09", "42%", money(sell(90918.00), cents=False)],
         ["E3-CX-SK-SUP-ST", "Splunk Standard Success Plan", "1", "$0.00", "—", "$0"],
-        ["E3A-TE-UNITS", "ThousandEyes Cloud & Enterprise Agents (per unit)", "1,500", "$0.84", "30%", "$31,860"],
-        ["E3A-TE-USERS", "ThousandEyes End User Monitoring Advantage", "1,500", "$8.31", "30%", "$314,280"],
+        ["E3A-TE-UNITS", "ThousandEyes Cloud & Enterprise Agents (per unit)", "1,500", "$0.84", "30%", money(sell(31860.00), cents=False)],
+        ["E3A-TE-USERS", "ThousandEyes End User Monitoring Advantage", "1,500", "$8.31", "30%", money(sell(314280.00), cents=False)],
         ["E3A-TE-S", "Cisco Support Basic for EA ThousandEyes", "1", "$0.00", "—", "$0"],
-        ["TOTAL", "", "", "", "", "$437,058"],
+        ["TOTAL", "", "", "", "", money(sell(437058.00), cents=False)],
     ]
     table = add_table(s, 7, 6, Inches(0.35), Inches(2.90), Inches(12.6), Inches(3.05))
     set_col_widths(table, [Inches(2.20), Inches(4.70), Inches(1.10), Inches(1.70), Inches(1.30), Inches(1.60)])
@@ -665,46 +732,51 @@ def s12_apps(prs):
         False,
         MUTED,
     )
-    footer(s, 12, TOTAL_SLIDES)
+    footer(s, 13, TOTAL_SLIDES)
     return s
 
 
 def s13_security(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Security", "Identity Services Engine (Zero Trust)", "SCU count 1,000  ·  Software $76,727  ·  CX $115,233  ·  Combined $191,960  ·  Full commitment")
+    header_bar(
+        s,
+        "Security",
+        "Identity Services Engine (Zero Trust)",
+        f"SCU 1,000  ·  Software {money(sell(76726.68), cents=False)}  ·  CX {money(sell(115233.48), cents=False)}  ·  Combined {money(sell(191960.16), cents=False)}  ·  22.5 pts GM",
+    )
 
     for i, item in enumerate([
         ("ISE ADVANTAGE", "3,450", "IB 400  →  desired 3,450", GOLD),
         ("ISE ESSENTIALS", "1,100", "IB 300  →  desired 1,100", BLUE),
-        ("SOFTWARE TCV", "$76,727", "42% subscription discount", CYAN),
-        ("ISE CX TCV", "$115,233", "Support Standard + credits", GREEN),
+        ("SOFTWARE TCV", money(sell(76726.68), cents=False), "42% Cisco subscription discount", CYAN),
+        ("ISE CX TCV", money(sell(115233.48), cents=False), "Support Standard + credits", GREEN),
     ]):
         kpi_card(s, Inches(0.40) + Inches(i * 3.20), Inches(1.42), Inches(3.05), Inches(1.22), *item)
 
-    headers = ["PID", "DESCRIPTION", "IB", "QTY", "DISC.", "NET TCV"]
+    headers = ["PID", "DESCRIPTION", "IB", "QTY", "DISC.", "HALLMARK TCV"]
     data = [
-        ["E3S-ISE-ADV", "ISE Advantage", "400", "3,450", "42%", "$70,470"],
-        ["E3S-ISE-ESS", "ISE Essentials", "300", "1,100", "42%", "$6,256"],
+        ["E3S-ISE-ADV", "ISE Advantage", "400", "3,450", "42%", money(sell(70470.36), cents=False)],
+        ["E3S-ISE-ESS", "ISE Essentials", "300", "1,100", "42%", money(sell(6256.32), cents=False)],
         ["SVS-E3S-ISE-B", "Cisco Support Basic for ISE", "0", "1", "23%", "$0"],
-        ["E3-CX-ISE-ENBD", "Support Standard  8x5xNBD for ISE", "6", "1", "23%", "$51,486"],
-        ["E3-CX-ISE-EPER", "Cisco Support Standard Perpetual for ISE", "20", "1", "24%", "$48,012"],
-        ["E3-CX-ISE-ESWP", "Support Standard SW Support OP for ISE", "0", "1", "23%", "$15,736"],
+        ["E3-CX-ISE-ENBD", "Support Standard  8x5xNBD for ISE", "6", "1", "23%", money(sell(51485.76), cents=False)],
+        ["E3-CX-ISE-EPER", "Cisco Support Standard Perpetual for ISE", "20", "1", "24%", money(sell(48011.76), cents=False)],
+        ["E3-CX-ISE-ESWP", "Support Standard SW Support OP for ISE", "0", "1", "23%", money(sell(15735.96), cents=False)],
         ["E3-CX-ISE-ENCD", "Support Standard  8x7xNCD for ISE", "1", "1", "23%", "$0"],
-        ["TOTAL SECURITY", "", "", "", "", "$191,960"],
+        ["TOTAL SECURITY", "", "", "", "", money(sell(191960.16), cents=False)],
     ]
     table = add_table(s, 9, 6, Inches(0.35), Inches(2.88), Inches(12.6), Inches(3.95))
     set_col_widths(table, [Inches(2.30), Inches(4.70), Inches(1.05), Inches(1.20), Inches(1.15), Inches(2.20)])
     aligns = [PP_ALIGN.LEFT, PP_ALIGN.LEFT, PP_ALIGN.RIGHT, PP_ALIGN.RIGHT, PP_ALIGN.CENTER, PP_ALIGN.RIGHT]
     fill_table(table, headers, data, col_align=aligns, header_size=10, body_size=12)
-    footer(s, 13, TOTAL_SLIDES)
+    footer(s, 14, TOTAL_SLIDES)
     return s
 
 
 def s14_collab(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Collaboration", "CX only — Employee Experience support", "No new Collaboration software on this proposal  ·  Services TCV $359,682  ·  Full commitment")
+    header_bar(s, "Collaboration", "CX only — Employee Experience support", f"No new Collaboration software  ·  Hallmark CX {money(sell(359681.76), cents=False)}  ·  22.5 pts GM")
 
     add_round(s, Inches(0.40), Inches(1.45), Inches(12.5), Inches(1.35), WHITE)
     add_textbox(s, Inches(0.65), Inches(1.58), Inches(12.0), Inches(0.35), "What is in scope", 16, True, NAVY)
@@ -714,17 +786,17 @@ def s14_collab(prs):
         Inches(1.95),
         Inches(12.0),
         Inches(0.65),
-        "This EA continues Cisco Support Standard on the existing Collaboration installed base (Employee Experience). There is no Webex or Calling software subscription on Proposal 9325586. Uncovered-asset credits and a program-migration incentive reduce net CX versus list.",
+        "This EA continues Cisco Support Standard on the existing Collaboration installed base (Employee Experience). There is no Webex or Calling software subscription on Proposal 9325586. Uncovered-asset credits and a program-migration incentive reduce Cisco net CX versus list; 22.5 pts GM is then applied.",
         13,
         False,
         MUTED,
     )
 
-    headers = ["PID", "DESCRIPTION", "IB", "QTY", "LIST", "CREDITS / OTD", "NET TCV"]
+    headers = ["PID", "DESCRIPTION", "IB", "QTY", "LIST", "CREDITS / OTD", "HALLMARK TCV"]
     data = [
-        ["E3-CX-COL-ENBD", "Support Standard  8x5xNBD  COLLAB", "110", "1", "$414,060", "Migration $44,362", "$273,770"],
-        ["E3-CX-COL-ENCD", "Support Standard  8x7xNCD  COLLAB", "92", "1", "$145,359", "Uncovered $21,425", "$85,912"],
-        ["TOTAL", "", "202", "", "$559,419", "", "$359,682"],
+        ["E3-CX-COL-ENBD", "Support Standard  8x5xNBD  COLLAB", "110", "1", "$414,060", "Migration $44,362", money(sell(273769.56), cents=False)],
+        ["E3-CX-COL-ENCD", "Support Standard  8x7xNCD  COLLAB", "92", "1", "$145,359", "Uncovered $21,425", money(sell(85912.20), cents=False)],
+        ["TOTAL", "", "202", "", "$559,419", "", money(sell(359681.76), cents=False)],
     ]
     table = add_table(s, 4, 7, Inches(0.35), Inches(3.05), Inches(12.6), Inches(2.15))
     set_col_widths(table, [Inches(2.15), Inches(3.55), Inches(0.85), Inches(0.80), Inches(1.35), Inches(1.85), Inches(2.05)])
@@ -744,21 +816,24 @@ def s14_collab(prs):
         False,
         MUTED,
     )
-    footer(s, 14, TOTAL_SLIDES)
+    footer(s, 15, TOTAL_SLIDES)
     return s
 
 
 def s15_schedule(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Commercial schedule", "Annual billing over 36 months", "Even annual cash view of net TCV — actual invoices follow Cisco EA billing rules and true-forward")
+    header_bar(s, "Commercial schedule", "Annual billing over 36 months", "Even annual cash view of Hallmark TCV (Cisco net + 22.5 pts GM)  —  invoices follow Cisco EA billing + partner wrap")
 
-    headers = ["PERIOD", "SOFTWARE", "SERVICES", "ANNUAL NET", "CUMULATIVE"]
+    y_sw = sell(1543828.20) / 3
+    y_svc = sell(1602761.76) / 3
+    y_tot = sell(3146589.96) / 3
+    headers = ["PERIOD", "SOFTWARE", "SERVICES", "ANNUAL", "CUMULATIVE"]
     data = [
-        ["Year 1  (from 16 Oct 2026)", "$514,609", "$534,254", "$1,048,863", "$1,048,863"],
-        ["Year 2", "$514,609", "$534,254", "$1,048,863", "$2,097,727"],
-        ["Year 3", "$514,609", "$534,254", "$1,048,863", "$3,146,590"],
-        ["3-YEAR TCV", "$1,543,828", "$1,602,762", "$3,146,590", "$3,146,590"],
+        ["Year 1  (from 16 Oct 2026)", money(y_sw, cents=False), money(y_svc, cents=False), money(y_tot, cents=False), money(y_tot, cents=False)],
+        ["Year 2", money(y_sw, cents=False), money(y_svc, cents=False), money(y_tot, cents=False), money(y_tot * 2, cents=False)],
+        ["Year 3", money(y_sw, cents=False), money(y_svc, cents=False), money(y_tot, cents=False), money(sell(3146589.96), cents=False)],
+        ["3-YEAR TCV", money(sell(1543828.20), cents=False), money(sell(1602761.76), cents=False), money(sell(3146589.96), cents=False), money(sell(3146589.96), cents=False)],
     ]
     table = add_table(s, 5, 5, Inches(0.45), Inches(1.45), Inches(12.4), Inches(2.55))
     set_col_widths(table, [Inches(3.30), Inches(2.25), Inches(2.25), Inches(2.30), Inches(2.30)])
@@ -766,9 +841,9 @@ def s15_schedule(prs):
     fill_table(table, headers, data, col_align=aligns, header_size=12, body_size=14)
 
     notes = [
-        ("True-forward", "EA quantities are a floor. Additional consumption during the year is licensed at EA rates and billed at the annual true-forward — no surprise list-price true-ups."),
-        ("IB credits", "One-time discounts ($475K) and uncovered-asset credits are already netted into TCV. They are not an extra year-1 concession on top of these figures."),
-        ("Partner path", "WWT is reseller of record (services bill-to 1001363275). Cisco AM Robin Randolph sponsors the deal through expected book date 16 Oct 2026."),
+        ("True-forward", "EA quantities are a floor. Additional consumption is licensed at EA rates, then wrapped with the same 22.5 pts GM — no surprise list-price true-ups."),
+        ("IB credits", "Cisco one-time discounts ($475K) are already in Cisco net. The 22.5-pt wrap is applied after those credits, not on top of list."),
+        ("Partner path", "WWT is reseller of record (services bill-to 1001363275). 22.5 pts GM is the partner commercial wrap on this EA."),
     ]
     for i, (t, b) in enumerate(notes):
         x = Inches(0.45) + Inches(i * 4.20)
@@ -776,22 +851,31 @@ def s15_schedule(prs):
         add_rect(s, x, Inches(4.25), Inches(4.00), Inches(0.08), GOLD if i == 0 else BLUE)
         add_textbox(s, x + Inches(0.20), Inches(4.45), Inches(3.60), Inches(0.40), t, 15, True, NAVY)
         add_textbox(s, x + Inches(0.20), Inches(4.90), Inches(3.60), Inches(1.80), b, 12, False, MUTED)
-    footer(s, 15, TOTAL_SLIDES)
+    footer(s, 16, TOTAL_SLIDES)
     return s
 
 
 def s16_value(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Value", "Discount architecture versus list", "List $6,987,826  ·  Programmatic + subscription discounts $3,366,176  ·  One-time $475,060")
+    header_bar(
+        s,
+        "Value",
+        "Hallmark price versus Cisco list",
+        f"List $6,987,826  ·  Hallmark {money(sell(3146589.96), cents=False)}  ·  Savings {money(6987825.78 - sell(3146589.96), cents=False)}  (41.9%)",
+    )
 
-    headers = ["PORTFOLIO", "LIST", "NET", "SAVINGS", "EFFECTIVE %"]
+    def row(name, lst, net):
+        h = sell(net)
+        return [name, money(lst, cents=False), money(h, cents=False), money(lst - h, cents=False), f"{(lst - h) / lst * 100:.1f}%"]
+
+    headers = ["PORTFOLIO", "LIST", "HALLMARK", "SAVINGS", "EFFECTIVE %"]
     data = [
-        ["Networking software", "$3,252,178", "$1,030,044", "$2,222,134", "68%"],
-        ["Applications software", "$650,862", "$437,058", "$213,804", "33%"],
-        ["Security software", "$136,244", "$76,727", "$59,517", "44%"],
-        ["CX services (all)", "$2,948,543", "$1,602,762", "$1,345,781", "46%"],
-        ["TOTAL", "$6,987,826", "$3,146,590", "$3,841,236", "55%"],
+        row("Networking software", 3252177.72, 1030043.52),
+        row("Applications software", 650862.00, 437058.00),
+        row("Security software", 136243.50, 76726.68),
+        row("CX services (all)", 2948542.56, 1602761.76),
+        row("TOTAL", 6987825.78, 3146589.96),
     ]
     table = add_table(s, 6, 5, Inches(0.45), Inches(1.42), Inches(12.4), Inches(2.85))
     set_col_widths(table, [Inches(3.40), Inches(2.25), Inches(2.25), Inches(2.25), Inches(2.25)])
@@ -799,28 +883,28 @@ def s16_value(prs):
     fill_table(table, headers, data, col_align=aligns, header_size=12, body_size=13)
 
     points = [
-        ("68% Networking software", "EA 3.0 suite discount (typically 68% after 10% programmatic) on Catalyst, Nexus, Meraki, and Spaces — the primary savings engine."),
-        ("CX at 23–35%", "Support Standard discounts plus program-migration incentives and uncovered-asset credits on switching, Nexus, ISE, and Collaboration."),
-        ("Apps at 30–42%", "ThousandEyes 30% and Splunk Cloud 42% subscription discounts on a full-commitment Applications suite."),
+        ("Cisco discounts still apply", "EA 3.0 suite discounts (up to 68% Networking, 30–42% Apps, 23–35% CX) sit underneath the partner wrap."),
+        ("22.5 pts GM wrap", "Hallmark price = Cisco EA net ÷ 0.775. Partner margin is $913,526 over three years — not a reduction of Cisco list discount."),
+        ("Still 41.9% vs list", "After margin, Hallmark is $2.93M under Cisco list $6.99M, with predictable annual true-forward at the same method."),
     ]
     for i, (t, b) in enumerate(points):
         x = Inches(0.45) + Inches(i * 4.20)
         add_round(s, x, Inches(4.50), Inches(4.00), Inches(2.40), WHITE)
-        add_textbox(s, x + Inches(0.20), Inches(4.65), Inches(3.60), Inches(0.45), t, 14, True, NAVY)
+        add_textbox(s, x + Inches(0.20), Inches(4.65), Inches(3.60), Inches(0.50), t, 14, True, NAVY)
         add_textbox(s, x + Inches(0.20), Inches(5.15), Inches(3.60), Inches(1.50), b, 12, False, MUTED)
-    footer(s, 16, TOTAL_SLIDES)
+    footer(s, 17, TOTAL_SLIDES)
     return s
 
 
 def s17_next(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_rect(s, 0, 0, SLIDE_W, SLIDE_H, OFF_WHITE)
-    header_bar(s, "Path to book", "Recommended next steps", "Target book / RSD: 16 October 2026")
+    header_bar(s, "Path to book", "Recommended next steps", "Target book / RSD: 16 October 2026  ·  Hallmark TCV $4.06M with 22.5 pts GM")
 
     steps = [
         ("1", "Confirm quantities", "Validate Qty Desired vs. IB for Catalyst DNA (especially C3850 x218 and DNA Wireless x525), ISE 3,450/1,100, and ThousandEyes 1,500/1,500."),
         ("2", "Lock suite mix", "Keep Full commitment on core suites; confirm Partial is still correct for Spaces ACT and Meraki cameras."),
-        ("3", "WWT quote path", "Convert this EAMP estimate to a WWT / Cisco approved quote. This file is indicative only."),
+        ("3", "WWT quote path", "Convert this EAMP estimate to a WWT / Cisco approved quote at 22.5 pts GM. This file is indicative only."),
         ("4", "Smart Account", "Confirm HALLMARK CARDS, INCORPORATED Smart Account is the entitlement destination before book."),
         ("5", "Legal / EA paper", "Standard Cisco EA 3.0 terms, true-forward, and CX service descriptions via WWT."),
         ("6", "Book 16 Oct 2026", "Align PO, annual billing, and RSD so software and CX start together."),
@@ -835,7 +919,7 @@ def s17_next(prs):
         add_textbox(s, x + Inches(0.20), y + Inches(0.22), Inches(0.48), Inches(0.48), n, 16, True, WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
         add_textbox(s, x + Inches(0.80), y + Inches(0.28), Inches(3.00), Inches(0.40), title, 16, True, NAVY)
         add_textbox(s, x + Inches(0.20), y + Inches(0.85), Inches(3.65), Inches(1.45), body, 13, False, MUTED)
-    footer(s, 17, TOTAL_SLIDES)
+    footer(s, 18, TOTAL_SLIDES)
     return s
 
 
@@ -851,7 +935,7 @@ def s18_close(prs):
         Inches(2.05),
         Inches(12),
         Inches(0.55),
-        "A 36-month Enterprise Agreement covering campus, data center, Meraki, Spaces,\nISE, Splunk, ThousandEyes, and Cisco CX — net $3.15M versus $6.99M list.",
+        "A 36-month Enterprise Agreement covering campus, data center, Meraki, Spaces,\nISE, Splunk, ThousandEyes, and Cisco CX — $4.06M Hallmark price versus $6.99M list.",
         16,
         False,
         CYAN,
@@ -859,7 +943,7 @@ def s18_close(prs):
 
     contacts = [
         ("CUSTOMER", "Hallmark Cards, Incorporated\n2501 McGee Traffic Way\nKansas City, MO 64141"),
-        ("PARTNER", "World Wide Technology, Inc\nReseller of record\nServices bill-to 1001363275"),
+        ("PARTNER", "World Wide Technology, Inc\nReseller of record\n22.5 pts GM wrap"),
         ("CISCO", "Robin Randolph\nCisco Account Manager\nrobrando@cisco.com"),
     ]
     for i, (h, body) in enumerate(contacts):
@@ -874,8 +958,8 @@ def s18_close(prs):
         Inches(5.40),
         Inches(12),
         Inches(1.40),
-        "Disclaimer: This presentation is derived from Cisco EAMP Price Estimate ID 9325586, generated 08-Sep-2026.\n"
-        "It contains indicative pricing only as of that date and is NOT an approved Cisco quote. Pricing is subject to change.\n"
+        "Disclaimer: Derived from Cisco EAMP Price Estimate ID 9325586 (08-Sep-2026), then wrapped with 22.5 points of partner gross margin.\n"
+        "Indicative pricing only — NOT an approved Cisco quote. Pricing is subject to change.\n"
         "CISCO CONFIDENTIAL — do not distribute outside Hallmark, World Wide Technology, and Cisco deal teams.",
         12,
         False,
@@ -893,6 +977,7 @@ def build(path: str):
     s02_agenda(prs)
     s03_snapshot(prs)
     s04_why_ea(prs)
+    s05_margin(prs)
     s05_investment(prs)
     s06_financials(prs)
     s07_mix(prs)
@@ -908,7 +993,6 @@ def build(path: str):
     s17_next(prs)
     s18_close(prs)
 
-    # Verify slide count matches footer
     actual = len(prs.slides)
     if actual != TOTAL_SLIDES:
         raise SystemExit(f"Slide count mismatch: built {actual}, footers assume {TOTAL_SLIDES}")
