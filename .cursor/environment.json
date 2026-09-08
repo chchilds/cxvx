@@ -1,0 +1,4 @@
+{
+  "name": "Cisco EA PPTX Generator",
+  "install": "bash .cursor/install.sh"
+}
