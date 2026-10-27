@@ -445,7 +445,16 @@ def build():
     section_heading(doc, "Certifications & Training")
     p = doc.add_paragraph()
     set_paragraph_spacing(p, before=3, after=1, exact=14)
-    r = p.add_run("Current / recent:  ")
+    r = p.add_run("Cisco certifications (valid through December 2026):  ")
+    set_run_font(r, size=10.5, bold=True, color=NAVY)
+    r = p.add_run(
+        "CCNP Routing & Switching; CCDP Design; CCNP Data Center; CCNA Voice."
+    )
+    set_run_font(r, size=10.5, color=BLACK)
+
+    p = doc.add_paragraph()
+    set_paragraph_spacing(p, before=1, after=1, exact=14)
+    r = p.add_run("Sales enablement:  ")
     set_run_font(r, size=10.5, bold=True, color=NAVY)
     r = p.add_run(
         "FY24 Services Sales (Oct 2023); IMPACT Ready ICs (Aug 2023); Cisco Recurring Revenue Metrics (Feb 2022)."
@@ -454,11 +463,10 @@ def build():
 
     p = doc.add_paragraph()
     set_paragraph_spacing(p, before=1, after=1, exact=14)
-    r = p.add_run("Previously held:  ")
+    r = p.add_run("Additional:  ")
     set_run_font(r, size=10.5, bold=True, color=NAVY)
     r = p.add_run(
-        "CCNP Routing & Switching, CCDP Design, CCNP Data Center, CCNA Voice (valid through 2020); "
-        "VCP 6.0 DCV (valid through 2018); CCIE Data Center written passed (lab date Nov 2017)."
+        "CCIE Data Center written passed (lab date Nov 2017); VCP 6.0 DCV."
     )
     set_run_font(r, size=10.5, color=BLACK)
 
