@@ -1,517 +1,444 @@
 #!/usr/bin/env python3
-"""Generate Chris Childs 2026 resume (v14) as a Word document."""
+"""Fill the original Word resume template with 2026 content and write a .docx."""
+
+from __future__ import annotations
 
 import os
+import shutil
+from copy import deepcopy
+from zipfile import ZipFile, ZIP_DEFLATED
+from xml.etree import ElementTree as ET
 
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_TAB_ALIGNMENT
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
+NSMAP = {
+    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "w14": "http://schemas.microsoft.com/office/word/2010/wordml",
+}
 
-NAVY = RGBColor(0x1B, 0x36, 0x5D)
-BLACK = RGBColor(0x22, 0x22, 0x22)
-GRAY = RGBColor(0x44, 0x44, 0x44)
-RULE = "1B365D"
+ET.register_namespace("w", NSMAP["w"])
+ET.register_namespace("w14", NSMAP["w14"])
+ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+ET.register_namespace("wpc", "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas")
+ET.register_namespace("mc", "http://schemas.openxmlformats.org/markup-compatibility/2006")
 
+SRC = "/home/ubuntu/.cursor/projects/workspace/uploads/Resume_-_Chris_Childs_2026__v13__a881.docx"
 OUT = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "Resume - Chris Childs 2026 (v14).docx",
 )
 
 
-def set_run_font(run, name="Calibri", size=11, bold=False, italic=False, color=BLACK):
-    run.font.name = name
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), name)
-    run.font.size = Pt(size)
-    run.bold = bold
-    run.italic = italic
-    run.font.color.rgb = color
+def q(tag: str) -> str:
+    return f"{W}{tag}"
 
 
-def set_paragraph_spacing(p, before=0, after=0, line=1.08, exact=None):
-    pf = p.paragraph_format
-    pf.space_before = Pt(before)
-    pf.space_after = Pt(after)
-    if exact is not None:
-        pf.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        pf.line_spacing = Pt(exact)
-    else:
-        pf.line_spacing = line
-    pf.widow_control = True
-
-
-def add_bottom_border(paragraph, color=RULE, size="12"):
-    pPr = paragraph._p.get_or_add_pPr()
-    pBdr = OxmlElement("w:pBdr")
-    bottom = OxmlElement("w:bottom")
-    bottom.set(qn("w:val"), "single")
-    bottom.set(qn("w:sz"), size)
-    bottom.set(qn("w:space"), "1")
-    bottom.set(qn("w:color"), color)
-    pBdr.append(bottom)
-    pPr.append(pBdr)
-
-
-def add_hyperlink(paragraph, text, url, size=10.5, color="1B365D"):
-    part = paragraph.part
-    r_id = part.relate_to(
-        url,
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
-        is_external=True,
-    )
-    hyperlink = OxmlElement("w:hyperlink")
-    hyperlink.set(qn("r:id"), r_id)
-    new_run = OxmlElement("w:r")
-    rPr = OxmlElement("w:rPr")
-    rFonts = OxmlElement("w:rFonts")
-    rFonts.set(qn("w:ascii"), "Calibri")
-    rFonts.set(qn("w:hAnsi"), "Calibri")
-    rPr.append(rFonts)
-    sz = OxmlElement("w:sz")
-    sz.set(qn("w:val"), str(int(size * 2)))
-    rPr.append(sz)
-    szCs = OxmlElement("w:szCs")
-    szCs.set(qn("w:val"), str(int(size * 2)))
-    rPr.append(szCs)
-    color_el = OxmlElement("w:color")
-    color_el.set(qn("w:val"), color)
-    rPr.append(color_el)
-    u = OxmlElement("w:u")
-    u.set(qn("w:val"), "single")
-    rPr.append(u)
-    new_run.append(rPr)
-    text_el = OxmlElement("w:t")
-    text_el.set(qn("xml:space"), "preserve")
-    text_el.text = text
-    new_run.append(text_el)
-    hyperlink.append(new_run)
-    paragraph._p.append(hyperlink)
-
-
-def section_heading(doc, text):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=8, after=3, exact=15)
-    run = p.add_run(text.upper())
-    set_run_font(run, size=12, bold=True, color=NAVY)
-    add_bottom_border(p)
+def clone_para(template: ET.Element, text: str) -> ET.Element:
+    """Clone a paragraph and replace its runs with a single text run."""
+    p = deepcopy(template)
+    rpr = None
+    for child in list(p):
+        if child.tag == q("r"):
+            if rpr is None:
+                found = child.find(q("rPr"))
+                if found is not None:
+                    rpr = deepcopy(found)
+            p.remove(child)
+        elif child.tag.endswith("}hyperlink"):
+            p.remove(child)
+    run = ET.SubElement(p, q("r"))
+    if rpr is not None:
+        run.append(rpr)
+    t = ET.SubElement(run, q("t"))
+    if text[:1].isspace() or text[-1:].isspace():
+        t.set(XML_SPACE, "preserve")
+    t.text = text
     return p
 
 
-def job_header(doc, title, dates):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=5, after=0, exact=14)
-    p.paragraph_format.keep_with_next = True
-    p.paragraph_format.tab_stops.add_tab_stop(Inches(7.2), WD_TAB_ALIGNMENT.RIGHT)
-    r = p.add_run(title)
-    set_run_font(r, size=11, bold=True, color=BLACK)
-    r = p.add_run("\t" + dates)
-    set_run_font(r, size=10.5, italic=True, color=GRAY)
+def clone_job_meta(template: ET.Element, company: str, dates: str) -> ET.Element:
+    """Company on the left, dates after a tab, matching the original layout."""
+    p = deepcopy(template)
+    rpr = None
+    date_rpr = None
+    runs = p.findall(q("r"))
+    if runs:
+        found = runs[0].find(q("rPr"))
+        if found is not None:
+            rpr = deepcopy(found)
+        # last non-tab run often holds the date formatting
+        for r in reversed(runs):
+            if r.find(q("tab")) is None and r.find(q("t")) is not None:
+                found = r.find(q("rPr"))
+                if found is not None:
+                    date_rpr = deepcopy(found)
+                break
+    for child in list(p):
+        if child.tag in (q("r"),) or child.tag.endswith("}hyperlink"):
+            p.remove(child)
+
+    def add_run(txt: str, props):
+        run = ET.SubElement(p, q("r"))
+        if props is not None:
+            run.append(deepcopy(props))
+        t = ET.SubElement(run, q("t"))
+        if txt[:1].isspace() or txt[-1:].isspace():
+            t.set(XML_SPACE, "preserve")
+        t.text = txt
+
+    add_run(company, rpr)
+    tab_run = ET.SubElement(p, q("r"))
+    if rpr is not None:
+        tab_run.append(deepcopy(rpr))
+    ET.SubElement(tab_run, q("tab"))
+    add_run(dates, date_rpr if date_rpr is not None else rpr)
     return p
 
 
-def company_line(doc, company, location):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=0, after=1, exact=13)
-    p.paragraph_format.keep_with_next = True
-    r = p.add_run(company)
-    set_run_font(r, size=10.5, italic=True, color=NAVY)
-    r = p.add_run(f"  |  {location}")
-    set_run_font(r, size=10.5, italic=False, color=GRAY)
+def empty_para(template: ET.Element) -> ET.Element:
+    p = deepcopy(template)
+    for child in list(p):
+        if child.tag == q("r") or child.tag.endswith("}hyperlink"):
+            p.remove(child)
     return p
 
 
-def bullet(doc, text, keep_next=True):
-    p = doc.add_paragraph(style="List Bullet")
-    set_paragraph_spacing(p, before=0, after=0, exact=13)
-    p.paragraph_format.left_indent = Inches(0.25)
-    p.paragraph_format.first_line_indent = Inches(-0.15)
-    p.paragraph_format.keep_with_next = keep_next
-    # Clear default run if any
-    if p.runs:
-        p.runs[0].text = ""
-    r = p.add_run(text)
-    set_run_font(r, size=10.5, color=BLACK)
-    return p
+def cell_tcpr(cell: ET.Element) -> ET.Element:
+    tcpr = cell.find(q("tcPr"))
+    if tcpr is None:
+        raise RuntimeError("cell missing tcPr")
+    return deepcopy(tcpr)
 
 
-def body(doc, text, size=10.5, italic=False, before=2, after=4):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=before, after=after, exact=14)
-    r = p.add_run(text)
-    set_run_font(r, size=size, italic=italic, color=BLACK)
-    return p
+def replace_cell(cell: ET.Element, paragraphs: list[ET.Element]) -> None:
+    tcpr = cell_tcpr(cell)
+    for child in list(cell):
+        cell.remove(child)
+    cell.append(tcpr)
+    for p in paragraphs:
+        cell.append(p)
 
 
-def edu_line(doc, left, right):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=2, after=0, exact=14)
-    p.paragraph_format.keep_with_next = True
-    p.paragraph_format.tab_stops.add_tab_stop(Inches(7.2), WD_TAB_ALIGNMENT.RIGHT)
-    r = p.add_run(left)
-    set_run_font(r, size=10.5, color=BLACK)
-    r = p.add_run("\t" + right)
-    set_run_font(r, size=10.5, italic=True, color=GRAY)
-    return p
+def build() -> None:
+    if not os.path.exists(SRC):
+        raise SystemExit(f"Original Word template not found: {SRC}")
 
+    shutil.copy2(SRC, OUT)
 
-def skill_row(doc, label, items):
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=1, after=1, exact=14)
-    r = p.add_run(f"{label}:  ")
-    set_run_font(r, size=10.5, bold=True, color=NAVY)
-    r = p.add_run(items)
-    set_run_font(r, size=10.5, color=BLACK)
-    return p
+    with ZipFile(SRC) as z:
+        xml = z.read("word/document.xml")
+        other = {n: z.read(n) for n in z.namelist() if n != "word/document.xml"}
 
+    root = ET.fromstring(xml)
+    tbl = root.find(f".//{q('tbl')}")
+    rows = tbl.findall(q("tr"))
+    name_cell, contact_cell = rows[0].findall(q("tc"))
+    body_cell, skills_cell = rows[1].findall(q("tc"))
+    refs_cell, empty_right = rows[2].findall(q("tc"))
 
-def build():
-    doc = Document()
+    left_paras = body_cell.findall(q("p"))
+    heading = left_paras[1]  # OBJECTIVE with bottom border
+    body_txt = left_paras[2]
+    job_title = left_paras[16]
+    job_meta = left_paras[17]
+    highlights = left_paras[18]
+    bullet = left_paras[19]
+    cert_line = left_paras[6]
+    spacer = left_paras[0]
+    skill_heading = rows[1].findall(q("tc"))[1].findall(q("p"))[1]
+    skill_cat = rows[1].findall(q("tc"))[1].findall(q("p"))[3]
+    skill_item = rows[1].findall(q("tc"))[1].findall(q("p"))[4]
+    name_p = name_cell.findall(q("p"))[0]
+    contact_p = contact_cell.findall(q("p"))[0]
+    refs_h = refs_cell.findall(q("p"))[2]
+    refs_b = refs_cell.findall(q("p"))[4]
 
-    section = doc.sections[0]
-    section.top_margin = Inches(0.5)
-    section.bottom_margin = Inches(0.45)
-    section.left_margin = Inches(0.65)
-    section.right_margin = Inches(0.65)
-    section.page_width = Inches(8.5)
-    section.page_height = Inches(11)
-    section.header_distance = Inches(0.3)
-    section.footer_distance = Inches(0.3)
-
-    # Default style
-    normal = doc.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.font.size = Pt(10.5)
-    normal.font.color.rgb = BLACK
-    normal._element.rPr.rFonts.set(qn("w:eastAsia"), "Calibri")
-
-    # Bullet style
-    bullet_style = doc.styles["List Bullet"]
-    bullet_style.font.name = "Calibri"
-    bullet_style.font.size = Pt(10.5)
-    pf = bullet_style.paragraph_format
-    pf.left_indent = Inches(0.25)
-    pf.first_line_indent = Inches(-0.15)
-
-    # Footer
-    footer = section.footer
-    footer.is_linked_to_previous = False
-    fp = footer.paragraphs[0]
-    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_paragraph_spacing(fp, before=0, after=0)
-    r = fp.add_run("Christopher E. Childs  ·  Resume 2026 (v14)  ·  Page ")
-    set_run_font(r, size=8.5, color=GRAY)
-    # PAGE field
-    fld_begin = OxmlElement("w:fldChar")
-    fld_begin.set(qn("w:fldCharType"), "begin")
-    instr = OxmlElement("w:instrText")
-    instr.set(qn("xml:space"), "preserve")
-    instr.text = " PAGE "
-    fld_sep = OxmlElement("w:fldChar")
-    fld_sep.set(qn("w:fldCharType"), "separate")
-    fld_text = OxmlElement("w:t")
-    fld_text.text = "1"
-    fld_end = OxmlElement("w:fldChar")
-    fld_end.set(qn("w:fldCharType"), "end")
-    run = fp.add_run()
-    set_run_font(run, size=8.5, color=GRAY)
-    run._r.append(fld_begin)
-    r2 = fp.add_run()
-    set_run_font(r2, size=8.5, color=GRAY)
-    r2._r.append(instr)
-    r3 = fp.add_run()
-    set_run_font(r3, size=8.5, color=GRAY)
-    r3._r.append(fld_sep)
-    r3._r.append(fld_text)
-    r4 = fp.add_run()
-    set_run_font(r4, size=8.5, color=GRAY)
-    r4._r.append(fld_end)
-    r = fp.add_run(" of ")
-    set_run_font(r, size=8.5, color=GRAY)
-    fld_begin = OxmlElement("w:fldChar")
-    fld_begin.set(qn("w:fldCharType"), "begin")
-    instr = OxmlElement("w:instrText")
-    instr.set(qn("xml:space"), "preserve")
-    instr.text = " NUMPAGES "
-    fld_sep = OxmlElement("w:fldChar")
-    fld_sep.set(qn("w:fldCharType"), "separate")
-    fld_text = OxmlElement("w:t")
-    fld_text.text = "2"
-    fld_end = OxmlElement("w:fldChar")
-    fld_end.set(qn("w:fldCharType"), "end")
-    run = fp.add_run()
-    set_run_font(run, size=8.5, color=GRAY)
-    run._r.append(fld_begin)
-    r2 = fp.add_run()
-    set_run_font(r2, size=8.5, color=GRAY)
-    r2._r.append(instr)
-    r3 = fp.add_run()
-    set_run_font(r3, size=8.5, color=GRAY)
-    r3._r.append(fld_sep)
-    r3._r.append(fld_text)
-    r4 = fp.add_run()
-    set_run_font(r4, size=8.5, color=GRAY)
-    r4._r.append(fld_end)
-
-    # ---- Header ----
-    name = doc.add_paragraph()
-    name.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_paragraph_spacing(name, before=0, after=1, exact=28)
-    r = name.add_run("CHRISTOPHER E. CHILDS")
-    set_run_font(r, size=22, bold=True, color=NAVY)
-
-    tag = doc.add_paragraph()
-    tag.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_paragraph_spacing(tag, before=0, after=4, exact=14)
-    r = tag.add_run(
-        "Premium Services Expert  ·  Strategic Software & Services Architect  ·  Cisco Sales Champion"
-    )
-    set_run_font(r, size=11, italic=True, color=GRAY)
-
-    contact = doc.add_paragraph()
-    contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_paragraph_spacing(contact, before=0, after=2, exact=13)
-    r = contact.add_run("6507 Glendower Rd, Raleigh, North Carolina 27613  ·  (919) 523-8426")
-    set_run_font(r, size=10.5, color=BLACK)
-
-    emails = doc.add_paragraph()
-    emails.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_paragraph_spacing(emails, before=0, after=2, exact=13)
-    add_hyperlink(emails, "Chchilds@cisco.com", "mailto:Chchilds@cisco.com")
-    r = emails.add_run("  ·  ")
-    set_run_font(r, size=10.5, color=BLACK)
-    add_hyperlink(emails, "Chris.E.Childs@gmail.com", "mailto:Chris.E.Childs@gmail.com")
-    r = emails.add_run("  ·  ")
-    set_run_font(r, size=10.5, color=BLACK)
-    add_hyperlink(
-        emails,
-        "linkedin.com/in/chrischildsraleigh",
-        "https://www.linkedin.com/in/chrischildsraleigh",
+    # --- Header ---
+    replace_cell(name_cell, [clone_para(name_p, "Christopher E. Childs")])
+    replace_cell(
+        contact_cell,
+        [
+            clone_para(contact_p, "6507 Glendower Rd"),
+            clone_para(contact_p, "Raleigh, North Carolina 27613"),
+            clone_para(contact_p, "Chchilds@cisco.com"),
+            clone_para(contact_p, "Chris.E.Childs@gmail.com"),
+            clone_para(contact_p, "(919) 523-8426"),
+            clone_para(contact_p, "linkedin.com/in/chrischildsraleigh"),
+        ],
     )
 
-    # ---- Summary ----
-    section_heading(doc, "Professional Summary")
-    body(
-        doc,
-        "Customer-focused Cisco combined seller and solutions engineer based in Raleigh, North Carolina, "
-        "with 14+ years at Cisco spanning premium services, strategic software, Enterprise Agreements, "
-        "and pre-sales architecture. "
-        "Designs consumption models that attach CX Enterprise Agreements (CXEA), Expert Care, Lifecycle Services, "
-        "and Advanced Services to software ELAs — and converts that design work into competitive wins across "
-        "security, collaboration, data center, wireless, and enterprise networking.",
-        before=3,
-        after=1,
+    left: list[ET.Element] = []
+    left.append(empty_para(spacer))
+    left.append(clone_para(heading, "OBJECTIVE"))
+    left.append(
+        clone_para(
+            body_txt,
+            "I am a solutions-driven, customer-savvy combined seller and EA architect focused on "
+            "ELA / Enterprise Agreement software and Premium Services consumption modeling, seeking "
+            "an opportunity to test and expand my skills through delivering superior client outcomes.",
+        )
+    )
+    left.append(empty_para(spacer))
+    left.append(clone_para(heading, "EDUCATION"))
+    left.append(clone_para(cert_line, "CCNP Routing & Switching          Valid through 12/2026"))
+    left.append(clone_para(cert_line, "CCDP Design                       Valid through 12/2026"))
+    left.append(clone_para(cert_line, "CCNP Data Center                  Valid through 12/2026"))
+    left.append(clone_para(cert_line, "CCNA Voice                        Valid through 12/2026"))
+    left.append(clone_para(cert_line, "CCIE Data Center Written passed — lab date 11/2017"))
+    left.append(clone_para(cert_line, "VCP 6.0 DCV; FY24 Services Sales; IMPACT Ready ICs; Recurring Revenue Metrics"))
+    left.append(clone_para(cert_line, "Wake Technical Community College — Networking Technology AAS — 2013, GPA 3.7"))
+    left.append(clone_para(cert_line, "East Carolina University — B.S. Industrial Technology — Completed 2018"))
+    left.append(empty_para(spacer))
+    left.append(clone_para(heading, "EXPERIENCE"))
+
+    def add_job(title, company, dates, highlight, bullets):
+        left.append(clone_para(job_title, title))
+        left.append(clone_job_meta(job_meta, company, dates))
+        left.append(clone_para(highlights, highlight))
+        for b in bullets:
+            left.append(clone_para(bullet, b))
+        left.append(empty_para(spacer))
+
+    add_job(
+        "EA Architect and Premium Service Seller — Combined Seller",
+        "Cisco Systems, Inc., Raleigh, NC",
+        "Aug 2023 – Present",
+        "Project Highlights include: Combo seller for Cisco Premium Services and Strategic Software — "
+        "CX Enterprise Agreements (CXEAs), Expert Care, Lifecycle Services (LCS), and Advanced Services (AS). "
+        "Architect software-plus-services consumption models that attach Premium Services to Enterprise "
+        "Agreements and drive recurring-revenue outcomes.",
+        [
+            "One Cisco architectures across networking, security, collaboration, and data center software",
+            "Cisco Sales Champion and GSX winner for software and services sales",
+            "IMPACT Ready IC (Aug 2023) and FY24 Services Sales (Oct 2023)",
+            "Full customer-facing combined seller motion with account teams and partners",
+        ],
+    )
+    add_job(
+        "Strategic Software Sales Specialist",
+        "Cisco Systems, Inc., Raleigh, NC",
+        "Oct 2019 – Present",
+        "Project Highlights include: Strategic software sales for Enterprise Agreements, ELA consumption, "
+        "and subscription / recurring-revenue offers across Cisco’s software portfolio.",
+        [
+            "FY22 Americas Sales Champion, Services & Software",
+            "Security, collaboration, networking, and data center software consumption plans",
+            "Cisco Recurring Revenue Metrics (Feb 2022)",
+            "SD-WAN, Meraki, security, contact center, and API/scripting use cases in software-led deals",
+        ],
+    )
+    add_job(
+        "Systems Engineer, Carolina Select",
+        "Cisco Systems, Inc., Raleigh, NC",
+        "Jan 2015 – Oct 2019",
+        "Project Highlights include: Technical and Engineering coordination for Cisco Select Healthcare, "
+        "Financial, and Manufacturing accounts based in South Carolina and North Carolina. Numerous "
+        "competitive wins in Security, Collaboration, Data Center, Wireless, Enterprise, Management, and "
+        "Software, blanketed in Advanced Services or partner-led engagements. Blended 100% consumption of "
+        "ELA/software adoption consisting of UC, C1, and Security. CloudCenter, ACI, and UCS Director "
+        "leveraged in competitive data-center-to-cloud conversations and catalog offerings modeled after "
+        "Cisco-on-Cisco use cases. Driving UPOE and LED lighting with CREE.",
+        [
+            "Customer Referenced Architecture delivered to every customer",
+            "Onsite and customer facing; travel for EBCs and Global CRO experiences",
+            "Full post-sales and customer excellence focused",
+            "Cisco Live Expo for LED and UPOE experiences",
+            "SE of multiple quarters in the Commercial region",
+            "Maintain and support 7 Carolina Select customers",
+            "High customer response and satisfaction feedback",
+            "SD-WAN, Meraki, Security portfolio, Contact Center, huge wins",
+            "Scripting and API use cases for Cisco offerings",
+        ],
+    )
+    add_job(
+        "Network Consulting Engineer",
+        "Cisco Systems, Inc., Raleigh, NC",
+        "Mar 2013 – Jan 2015",
+        "Project Highlights include: Data Center Design and Implement WAAS and ACE appliances for customer "
+        "production environments. This includes HLD and LLD as well as Network Implementation Plan "
+        "documentation. Configure and Optimize Data Center networks. Work closely with Cisco TAC Engineers "
+        "and BU to develop customer solutions, and troubleshoot various Cisco Data Center scenarios for "
+        "enterprise deployments.",
+        [
+            "Daily customer contact (Customer facing time +90% per quarter)",
+            "Planning and Deliverables for Project Management",
+            "Maintain and support 6 Advanced Services Enterprise Customers",
+            "High customer response and satisfaction feedback",
+            "UCS support and deployment",
+            "On-site for Knowledge Transfers for customer trainings",
+            "WAAS and ACE design, configuration, and deployment",
+        ],
+    )
+    add_job(
+        "Network Engineer",
+        "Cisco Systems, Inc., Raleigh, NC",
+        "May 2012 – Mar 2013",
+        "Project Highlights include: Handling incidents for Cisco customers in a NOC environment, "
+        "troubleshooting circuits and internal customer networks, utilizing Remedy and Cisco MAP for "
+        "managing incidents, working closely with Cisco TAC Engineers to develop customer solutions, and "
+        "troubleshooting various Cisco routers, switches and security appliances for both large campus and "
+        "local branch deployments.",
+        [
+            "Configured and solve connectivity issues for LANs and Wireless LANs for Cisco premier customers",
+            "Nexus NX-OS 7000, ASR5k 3G, ASR9k IOS XR LTE, cell tower backhaul, TACACS+/ACS, IronPort, IPsec/VPN",
+            "BGP, OSPF, EIGRP troubleshooting; SLA/SLO reporting and customer delivery",
+            "Developed NOC processes, outage email templates, and a web interface for shift/incident handover",
+            "Technical Environment (Development): Scripting, web pages",
+            "Technical Environment (Creation): Numerous NOC processes",
+        ],
+    )
+    add_job(
+        "Realtor",
+        "Smart Choice Realty and ERA United Home Realty, Raleigh, NC",
+        "2006 – 2012",
+        "Project Highlights: Created and maintained a website and email server for large Real Estate firm. "
+        "Data Entry and digital photo uploads, client database searches and search parameter settings; "
+        "Website/Email server design and upkeep; PDF contracts and digital document signing and image "
+        "storage and contract retrieval.",
+        [],
+    )
+    add_job(
+        "Sales Associate / Geek Squad",
+        "Best Buy, Cary, NC",
+        "2004 – 2006",
+        "Project Highlights: Computer Department — Customer Sales; technical assistance with home and "
+        "small business networking. MVP award for Exemplary Service.",
+        [],
+    )
+    add_job(
+        "General Manager",
+        "Papa John's, Cary, NC",
+        "2000 – 2004",
+        "Project Highlights: Verification and troubleshooting end device and credit card machine internet "
+        "connectivity, customer database upkeep, synchronized in store coupons to website online ordering, "
+        "created productivity/profit & loss reports and inventory database reporting.",
+        [],
     )
 
-    # ---- Experience ----
-    section_heading(doc, "Experience")
+    left.append(clone_para(heading, "REFERENCES"))
+    left.append(
+        clone_para(
+            refs_b,
+            "Professional and personal references - available on request.",
+        )
+    )
+    replace_cell(body_cell, left)
 
-    company_line(doc, "Cisco Systems, Inc.", "Raleigh, NC")
+    skills: list[ET.Element] = [
+        empty_para(spacer),
+        clone_para(skill_heading, "Skills"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Software & Services"),
+        clone_para(skill_item, "ENTERPRISE AGREEMENTS"),
+        clone_para(skill_item, "ELA / CXEA"),
+        clone_para(skill_item, "PREMIUM SERVICES"),
+        clone_para(skill_item, "EXPERT CARE / LCS / AS"),
+        clone_para(skill_item, "CONSUMPTION MODELING"),
+        clone_para(skill_item, "RECURRING REVENUE"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Personal"),
+        clone_para(skill_item, "MULTI-TASKING"),
+        clone_para(skill_item, "SOLUTION ORIENTED"),
+        clone_para(skill_item, "COMMUNICATIVE"),
+        clone_para(skill_item, "TIME-MANAGEMENT"),
+        clone_para(skill_item, "FLEXIBLE"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Networking"),
+        clone_para(skill_item, "ACCESS CONTROL"),
+        clone_para(skill_item, "ACL/VACL/RACL"),
+        clone_para(skill_item, "DHCP"),
+        clone_para(skill_item, "DNS"),
+        clone_para(skill_item, "DOCUMENTATION"),
+        clone_para(skill_item, "ETHERNET"),
+        clone_para(skill_item, "IPv6"),
+        clone_para(skill_item, "NAT / PAT"),
+        clone_para(skill_item, "PACKET ANALYSIS"),
+        clone_para(skill_item, "QoS"),
+        clone_para(skill_item, "OSPF"),
+        clone_para(skill_item, "BGP"),
+        clone_para(skill_item, "VTP"),
+        clone_para(skill_item, "PORT CHANNEL"),
+        clone_para(skill_item, "ROUTING"),
+        clone_para(skill_item, "SWITCH SECURITY"),
+        clone_para(skill_item, "SNMP"),
+        clone_para(skill_item, "STP, MST, PVST"),
+        clone_para(skill_item, "TCP/IP"),
+        clone_para(skill_item, "UC SUPPORT"),
+        clone_para(skill_item, "VLAN / PVLAN"),
+        clone_para(skill_item, "VOICE"),
+        clone_para(skill_item, "VPN"),
+        clone_para(skill_item, "WIRELESS"),
+        clone_para(skill_item, "SD-WAN"),
+        clone_para(skill_item, "MERAKI"),
+        clone_para(skill_item, "WAN"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Firewalls"),
+        clone_para(skill_item, "CISCO ASA"),
+        clone_para(skill_item, "SECURITY PORTFOLIO"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Monitoring"),
+        clone_para(skill_item, "REMEDY"),
+        clone_para(skill_item, "CISCO MAP"),
+        clone_para(skill_item, "EMAIL REPORTS"),
+        clone_para(skill_item, "SNMP"),
+        clone_para(skill_item, "WIRESHARK"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Cisco"),
+        clone_para(skill_item, "IOS"),
+        clone_para(skill_item, "XR"),
+        clone_para(skill_item, "NX-OS"),
+        clone_para(skill_item, "ASA"),
+        clone_para(skill_item, "CATALYST"),
+        clone_para(skill_item, "ACI"),
+        clone_para(skill_item, "UCS"),
+        clone_para(skill_item, "ARUBA"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Virtualization"),
+        clone_para(skill_item, "VMWARE (ESXi)"),
+        empty_para(spacer),
+        clone_para(skill_cat, "Automation"),
+        clone_para(skill_item, "SCRIPTING"),
+        clone_para(skill_item, "CISCO APIs"),
+    ]
+    replace_cell(skills_cell, skills)
 
-    job_header(
-        doc,
-        "EA Architect & Premium Service Seller (Combined Seller)",
-        "August 2023 – Present",
-    )
-    bullet(
-        doc,
-        "Combined seller for Cisco Premium Services and Strategic Software: architect CX Enterprise Agreements "
-        "(CXEAs), Expert Care, Lifecycle Services (LCS), and Advanced Services (AS) offers as a single customer motion.",
-    )
-    bullet(
-        doc,
-        "Design software-plus-services consumption models that attach Premium Services to Enterprise Agreements "
-        "and drive recurring-revenue, True Forward, and high-adoption outcomes.",
-    )
-    bullet(
-        doc,
-        "Partner with account teams, partners, and customers to position One Cisco architectures across "
-        "networking, security, collaboration, and data center software.",
-    )
-    bullet(
-        doc,
-        "Recognized as a Cisco Sales Champion and GSX winner for software and services sales; "
-        "completed IMPACT Ready IC (Aug 2023) and FY24 Services Sales (Oct 2023).",
-        keep_next=False,
-    )
+    # Drop the original third table row (it was only REFERENCES and created a blank extra page).
+    tbl.remove(rows[2])
 
-    job_header(doc, "Strategic Software Sales Specialist", "October 2019 – Present")
-    bullet(
-        doc,
-        "Lead strategic software sales for Enterprise Agreements, ELA consumption, and subscription / "
-        "recurring-revenue offers across Cisco’s software portfolio.",
-    )
-    bullet(
-        doc,
-        "Named FY22 Americas Sales Champion, Services & Software — recognized among Cisco’s top "
-        "Americas software and services sellers.",
-    )
-    bullet(
-        doc,
-        "Translate security, collaboration, networking, and data center software into customer consumption "
-        "and adoption plans; completed Cisco Recurring Revenue Metrics (Feb 2022).",
-    )
-    bullet(
-        doc,
-        "Carry forward SE-honed competitive displacement skills — SD-WAN, Meraki, security, contact center, "
-        "and API/scripting use cases — into software-led deals.",
-        keep_next=False,
-    )
+    # Original template kept an empty paragraph after the table, which forces a blank
+    # last page. Fold sectPr into the last body paragraph instead.
+    body = root.find(q("body"))
+    sect = body.find(q("sectPr"))
+    for child in list(body):
+        if child.tag == q("p"):
+            body.remove(child)
+    last_p = body_cell.findall(q("p"))[-1]
+    ppr = last_p.find(q("pPr"))
+    if ppr is None:
+        ppr = ET.Element(q("pPr"))
+        last_p.insert(0, ppr)
+    if sect is not None:
+        body.remove(sect)
+        ppr.append(sect)
 
-    job_header(doc, "Systems Engineer, Carolina Select", "January 2015 – October 2019")
-    bullet(
-        doc,
-        "Technical and engineering lead for Cisco Select healthcare, financial, and manufacturing accounts in "
-        "North and South Carolina. Competitive wins in security, collaboration, data center, wireless, enterprise, "
-        "management, and software, delivered with Advanced Services or partner-led engagements.",
-    )
-    bullet(
-        doc,
-        "Drove blended 100% ELA / software consumption spanning UC, ONE (C1), and Security; used CloudCenter, ACI, "
-        "and UCS Director in competitive data-center-to-cloud conversations modeled on Cisco-on-Cisco catalog offerings.",
-    )
-    bullet(
-        doc,
-        "SE of multiple quarters in Commercial; seven Carolina Select customers; customer-referenced architectures, "
-        "EBCs, Global CRO travel, Cisco Live Expo for LED / UPOE with CREE, plus scripting and API use cases.",
-    )
-    bullet(
-        doc,
-        "Major wins in SD-WAN, Meraki, Security portfolio, and Contact Center; full post-sales and customer-excellence focus.",
-        keep_next=False,
-    )
+    # Update core title
+    if "docProps/core.xml" in other:
+        core = ET.fromstring(other["docProps/core.xml"])
+        # namespaces vary; set dc:title if present
+        for el in core.iter():
+            if el.tag.endswith("}title"):
+                el.text = "Resume — Christopher E. Childs 2026 (v14)"
+            if el.tag.endswith("}lastModifiedBy"):
+                el.text = "Christopher E. Childs"
+        other["docProps/core.xml"] = ET.tostring(core, encoding="utf-8", xml_declaration=True)
 
-    job_header(doc, "Network Consulting Engineer", "March 2013 – January 2015")
-    bullet(
-        doc,
-        "Designed and implemented WAAS and ACE for production data centers (HLD, LLD, NIP); 90%+ customer-facing time; "
-        "six Advanced Services enterprise customers; UCS deploy and on-site knowledge transfers with TAC and BU partners.",
-        keep_next=False,
-    )
-
-    job_header(doc, "Network Engineer, Remote Management Services", "May 2012 – March 2013")
-    bullet(
-        doc,
-        "NOC incident handling for Cisco premier customers (Remedy, Cisco MAP, TAC): LAN/WLAN, Nexus 7000 NX-OS, "
-        "ASR5k 3G, ASR9k IOS XR LTE, backhaul, TACACS+/ACS, IronPort, IPsec/VPN, BGP/OSPF/EIGRP; built handover, "
-        "outage-mailer, and NMS-access processes with SLA/SLO reporting.",
-        keep_next=False,
-    )
-
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=6, after=1, exact=14)
-    p.paragraph_format.keep_with_next = True
-    r = p.add_run("Earlier career")
-    set_run_font(r, size=11, bold=True, color=BLACK)
-
-    bullet(
-        doc,
-        "Realtor, Smart Choice Realty and ERA United Home Realty, Raleigh, NC (2006–2012) — built and maintained "
-        "the firm website and email server; client database search, digital photos, PDF contracts, and e-sign storage.",
-    )
-    bullet(
-        doc,
-        "Sales Associate / Geek Squad, Best Buy, Cary, NC (2004–2006) — computer sales and home/small-business "
-        "networking support; MVP award for Exemplary Service.",
-    )
-    bullet(
-        doc,
-        "General Manager, Papa John’s, Cary, NC (2000–2004) — POS/credit-card connectivity, customer database, "
-        "web-ordering coupon sync, and productivity / P&L / inventory reporting.",
-        keep_next=False,
-    )
-
-    # ---- Education ----
-    section_heading(doc, "Education")
-    edu_line(
-        doc,
-        "East Carolina University — B.S., Industrial Technology",
-        "Completed 2018",
-    )
-    edu_line(
-        doc,
-        "Wake Technical Community College — A.A.S., Networking Technology, GPA 3.7",
-        "2013",
-    )
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=1, after=0, exact=13)
-    r = p.add_run(
-        "Wake Tech: student leader / peer tutor; Disability Support Services presentation on transitioning for "
-        "students with disabilities.  ECU: recruiting for Cisco Advanced Services internships."
-    )
-    set_run_font(r, size=10, italic=True, color=GRAY)
-
-    # ---- Certifications ----
-    section_heading(doc, "Certifications & Training")
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=3, after=1, exact=14)
-    r = p.add_run("Cisco certifications (valid through December 2026):  ")
-    set_run_font(r, size=10.5, bold=True, color=NAVY)
-    r = p.add_run(
-        "CCNP Routing & Switching; CCDP Design; CCNP Data Center; CCNA Voice."
-    )
-    set_run_font(r, size=10.5, color=BLACK)
-
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=1, after=1, exact=14)
-    r = p.add_run("Sales enablement:  ")
-    set_run_font(r, size=10.5, bold=True, color=NAVY)
-    r = p.add_run(
-        "FY24 Services Sales (Oct 2023); IMPACT Ready ICs (Aug 2023); Cisco Recurring Revenue Metrics (Feb 2022)."
-    )
-    set_run_font(r, size=10.5, color=BLACK)
-
-    p = doc.add_paragraph()
-    set_paragraph_spacing(p, before=1, after=1, exact=14)
-    r = p.add_run("Additional:  ")
-    set_run_font(r, size=10.5, bold=True, color=NAVY)
-    r = p.add_run(
-        "CCIE Data Center written passed (lab date Nov 2017); VCP 6.0 DCV."
-    )
-    set_run_font(r, size=10.5, color=BLACK)
-
-    # ---- Skills ----
-    section_heading(doc, "Skills")
-    skill_row(
-        doc,
-        "Software & services sales",
-        "Enterprise Agreements / ELA, CXEA, Premium Services, Expert Care, LCS, Advanced Services, "
-        "consumption modeling, recurring revenue, True Forward, One Cisco",
-    )
-    skill_row(
-        doc,
-        "Architecture",
-        "SD-WAN, Meraki, Security portfolio, Contact Center / UC, ACI, UCS, CloudCenter, wireless, campus / WAN, UPOE",
-    )
-    skill_row(
-        doc,
-        "Engineering",
-        "Routing & switching (BGP, OSPF, EIGRP, STP/VLANs), NX-OS / IOS / IOS XR, ASA / IronPort, IPsec VPN, QoS, IPv6, packet analysis",
-    )
-    skill_row(
-        doc,
-        "Automation & tools",
-        "Scripting and Cisco APIs, Wireshark, SNMP, Remedy, documentation, customer-referenced architectures",
-    )
-    skill_row(
-        doc,
-        "Personal",
-        "Customer-facing, multi-account ownership, solution-oriented, communicative, time management, flexible",
-    )
-
-    # Core properties
-    core = doc.core_properties
-    core.author = "Christopher E. Childs"
-    core.last_modified_by = "Christopher E. Childs"
-    core.title = "Resume — Christopher E. Childs 2026 (v14)"
-    core.subject = "Cisco EA Architect, Premium Service Seller, and Strategic Software Sales Specialist"
-    core.category = "Resume"
-    core.comments = (
-        "v14: current Cisco combined-seller roles; based in Raleigh, NC "
-        "(6507 Glendower Rd, Raleigh, NC 27613)."
-    )
-
-    doc.save(OUT)
+    document_xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    tmp = OUT + ".tmp"
+    with ZipFile(tmp, "w", ZIP_DEFLATED) as z:
+        for name, data in other.items():
+            z.writestr(name, data)
+        z.writestr("word/document.xml", document_xml)
+    os.replace(tmp, OUT)
     print("Wrote", OUT)
 
 
