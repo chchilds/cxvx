@@ -271,7 +271,7 @@ def build():
     contact = doc.add_paragraph()
     contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
     set_paragraph_spacing(contact, before=0, after=2, exact=13)
-    r = contact.add_run("2632 Gross Ave, Wake Forest, North Carolina 27587  ·  (919) 523-8426")
+    r = contact.add_run("6507 Glendower Rd, Raleigh, North Carolina 27613  ·  (919) 523-8426")
     set_run_font(r, size=10.5, color=BLACK)
 
     emails = doc.add_paragraph()
@@ -293,8 +293,9 @@ def build():
     section_heading(doc, "Professional Summary")
     body(
         doc,
-        "Customer-focused Cisco combined seller and solutions engineer with 14+ years at Cisco spanning "
-        "premium services, strategic software, Enterprise Agreements, and pre-sales architecture. "
+        "Customer-focused Cisco combined seller and solutions engineer based in Raleigh, North Carolina, "
+        "with 14+ years at Cisco spanning premium services, strategic software, Enterprise Agreements, "
+        "and pre-sales architecture. "
         "Designs consumption models that attach CX Enterprise Agreements (CXEA), Expert Care, Lifecycle Services, "
         "and Advanced Services to software ELAs — and converts that design work into competitive wins across "
         "security, collaboration, data center, wireless, and enterprise networking.",
@@ -305,7 +306,7 @@ def build():
     # ---- Experience ----
     section_heading(doc, "Experience")
 
-    company_line(doc, "Cisco Systems, Inc.", "RTP, NC  ·  Denver, CO  ·  United States")
+    company_line(doc, "Cisco Systems, Inc.", "Raleigh, NC")
 
     job_header(
         doc,
@@ -498,8 +499,8 @@ def build():
     core.subject = "Cisco EA Architect, Premium Service Seller, and Strategic Software Sales Specialist"
     core.category = "Resume"
     core.comments = (
-        "Updated from v13 to add EA Architect / Combined Seller (Aug 2023–Present) "
-        "and Strategic Software Sales Specialist (Oct 2019–Present); closed Carolina Select SE at Oct 2019."
+        "v14: current Cisco combined-seller roles; based in Raleigh, NC "
+        "(6507 Glendower Rd, Raleigh, NC 27613)."
     )
 
     doc.save(OUT)
