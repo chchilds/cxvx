@@ -151,7 +151,7 @@ def draw():
             False,
             "Cisco Support",
             "Keep it running",
-            "Standard / Enhanced / Signature. TAC, RMA, software updates, Cisco IQ insights. Not Professional Services.",
+            "Basic / Standard / Signature, powered by Cisco IQ. Lead Standard+. TAC, RMA, lifecycle insights, RIS Playbook. Not Professional Services.",
         ),
         (
             True,
