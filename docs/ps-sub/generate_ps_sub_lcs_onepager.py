@@ -22,17 +22,22 @@ pdfmetrics.registerFont(TTFont("Inter-Med", str(FONT_DIR / "Inter-Medium.ttf")))
 pdfmetrics.registerFont(TTFont("Inter-Semi", str(FONT_DIR / "Inter-SemiBold.ttf")))
 pdfmetrics.registerFont(TTFont("Inter-Bold", str(FONT_DIR / "Inter-Bold.ttf")))
 
-NAVY = HexColor("#0D274D")
-DEEP = HexColor("#081A33")
+BG = HexColor("#0E1A2B")
+NAVY = HexColor("#0B1624")
+DEEP = HexColor("#081018")
+HOT = HexColor("#134A6E")
 CYAN = HexColor("#00BCEB")
-INK = HexColor("#1B2A3A")
-MUTED = HexColor("#5C6B7A")
-OFF = HexColor("#F4F7F9")
-LINE = HexColor("#D5DEE7")
+INK = HexColor("#D7E4EF")
+TITLE = HexColor("#F3F7FB")
+MUTED = HexColor("#9BB4C9")
+OFF = HexColor("#17283C")
+LINE = HexColor("#2C4158")
 GOLD = HexColor("#C6A552")
-GROW = HexColor("#0E6B5C")
-STRONG = HexColor("#8A5A12")
-WARN = HexColor("#8B2E2E")
+GROW = HexColor("#5EE0B5")
+STRONG = HexColor("#E0B45A")
+WARN = HexColor("#F07171")
+AMBER = HexColor("#2A2416")
+BETTER = HexColor("#5BA3C9")
 
 
 def rrect(c, x, y, w, h, r=6, fill=None, stroke=None, sw=0.7):
@@ -123,6 +128,8 @@ def draw():
     gap = 7
 
     # Header
+    c.setFillColor(BG)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
     c.setFillColor(NAVY)
     c.rect(0, H - header_h, W, header_h, fill=1, stroke=0)
     c.setFillColor(CYAN)
@@ -170,7 +177,7 @@ def draw():
     for i, (hot, title, sub, body) in enumerate(offers):
         x = m + i * (ow + gap)
         if hot:
-            rrect(c, x, sit_y, ow, sit_h, r=6, fill=NAVY)
+            rrect(c, x, sit_y, ow, sit_h, r=6, fill=HOT)
             c.setFillColor(CYAN)
             c.setFont("Inter-Semi", 6.0)
             c.drawString(x + 10, sit_y + sit_h - 12, "SERVICES OFFERING")
@@ -186,7 +193,7 @@ def draw():
             c.setFillColor(MUTED)
             c.setFont("Inter-Semi", 6.0)
             c.drawString(x + 10, sit_y + sit_h - 12, "SERVICES OFFERING")
-            c.setFillColor(NAVY)
+            c.setFillColor(TITLE)
             c.setFont("Inter-Bold", 8.6)
             c.drawString(x + 10, sit_y + sit_h - 24, title)
             c.setFillColor(MUTED)
@@ -215,13 +222,13 @@ def draw():
     inner_w = (W - 2 * m - 20 - 5 * 6) / 6
     for i, (title, items) in enumerate(phases):
         x = m + 10 + i * (inner_w + 6)
-        rrect(c, x, inner_y, inner_w, inner_h, r=5, fill=white)
+        rrect(c, x, inner_y, inner_w, inner_h, r=5, fill=HexColor("#1C3048"))
         c.setFillColor(CYAN)
         c.circle(x + 9, inner_y + inner_h - 11, 6.2, fill=1, stroke=0)
         c.setFillColor(NAVY)
         c.setFont("Inter-Bold", 6.4)
         c.drawCentredString(x + 9, inner_y + inner_h - 13.2, str(i + 1))
-        c.setFillColor(NAVY)
+        c.setFillColor(TITLE)
         c.setFont("Inter-Bold", 7.4)
         c.drawString(x + 18, inner_y + inner_h - 14, title)
         bullet_block(c, items, x + 7, inner_y + inner_h - 28, inner_w - 14, size=6.05, leading=9.0)
@@ -233,7 +240,7 @@ def draw():
 
     # Col 1 — how the subscription is built
     x = m
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "How PS-Sub is packaged", x + 10, col_y + col_h - 13)
     packs = [
         (
@@ -251,7 +258,7 @@ def draw():
     ]
     yy = col_y + col_h - 28
     for title, body in packs:
-        c.setFillColor(NAVY)
+        c.setFillColor(TITLE)
         c.setFont("Inter-Bold", 7.5)
         c.drawString(x + 10, yy, title)
         yy -= 11
@@ -262,16 +269,16 @@ def draw():
     steps = ["1 Baseline", "2 Analyze", "3 Recommend", "4 Execute", "5 Measure"]
     sx = x + 10
     for s in steps:
-        sx += chip(c, s, sx, yy - 2, h=13, fill=NAVY, fg=white, size=5.7, pad=5) + 4
+        sx += chip(c, s, sx, yy - 2, h=13, fill=HOT, fg=white, size=5.7, pad=5) + 4
     yy -= 22
-    rrect(c, x + 8, yy - 40, cw - 16, 48, r=5, fill=OFF)
-    c.setFillColor(NAVY)
+    rrect(c, x + 8, yy - 40, cw - 16, 48, r=5, fill=HexColor("#1C3048"))
+    c.setFillColor(TITLE)
     c.setFont("Inter-Semi", 6.3)
     c.drawString(x + 16, yy - 8, "Engage the way the customer works")
     modes = [("Advise Me", "Guided"), ("Do It With Me", "Assisted"), ("Do It For Me", "Assured")]
     for i, (t, s) in enumerate(modes):
         mx = x + 16 + i * 78
-        rrect(c, mx, yy - 36, 74, 24, r=4, fill=NAVY)
+        rrect(c, mx, yy - 36, 74, 24, r=4, fill=HOT)
         c.setFillColor(white)
         c.setFont("Inter-Semi", 6.1)
         c.drawCentredString(mx + 37, yy - 22, t)
@@ -281,7 +288,7 @@ def draw():
 
     # Col 2 — Digital Insights + ability catalogue
     x = m + cw + gap
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "Digital Insights  ·  telemetry + expert judgment", x + 10, col_y + col_h - 13)
     insights = [
         "Config complexity, misconfig, inconsistency",
@@ -310,18 +317,18 @@ def draw():
 
     # Col 3 — outcomes, cadence, guardrail
     x = m + 2 * (cw + gap)
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "Business outcomes on the quote", x + 10, col_y + col_h - 13)
     groups = [
         (GROW, "Grow faster", "Digital transformation · new capabilities · CX · end-user experience · revenue"),
         (STRONG, "Be stronger", "Reduce risk · compliance · enhance security · reputation / brand"),
-        (HexColor("#005073"), "Deliver better", "Optimize productivity · reduce cost"),
+        (BETTER, "Deliver better", "Optimize productivity · reduce cost"),
     ]
     yy = col_y + col_h - 28
     for color, title, body in groups:
         c.setFillColor(color)
         c.roundRect(x + 10, yy - 1.4, 6, 9, 1.4, fill=1, stroke=0)
-        c.setFillColor(NAVY)
+        c.setFillColor(TITLE)
         c.setFont("Inter-Bold", 7.4)
         c.drawString(x + 20, yy, title)
         yy -= 11
@@ -342,7 +349,7 @@ def draw():
     )
     box_h = 92
     by = max(col_y + 8, yy - box_h - 6)
-    rrect(c, x + 8, by, cw - 16, box_h, r=5, fill=HexColor("#F7F1E4"), stroke=GOLD, sw=0.85)
+    rrect(c, x + 8, by, cw - 16, box_h, r=5, fill=AMBER, stroke=GOLD, sw=0.85)
     kicker(c, "Keep the motion clean", x + 16, by + box_h - 12, color=STRONG)
     c.setFillColor(GROW)
     c.setFont("Inter-Semi", 6.3)

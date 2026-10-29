@@ -21,16 +21,20 @@ pdfmetrics.registerFont(TTFont("Inter-Med", str(FONT_DIR / "Inter-Medium.ttf")))
 pdfmetrics.registerFont(TTFont("Inter-Semi", str(FONT_DIR / "Inter-SemiBold.ttf")))
 pdfmetrics.registerFont(TTFont("Inter-Bold", str(FONT_DIR / "Inter-Bold.ttf")))
 
-NAVY = HexColor("#0D274D")
-DEEP = HexColor("#081A33")
+BG = HexColor("#0E1A2B")
+NAVY = HexColor("#0B1624")
+DEEP = HexColor("#081018")
+HOT = HexColor("#134A6E")
 CYAN = HexColor("#00BCEB")
-INK = HexColor("#1B2A3A")
-MUTED = HexColor("#5C6B7A")
-OFF = HexColor("#F4F7F9")
-LINE = HexColor("#D5DEE7")
+INK = HexColor("#D7E4EF")
+TITLE = HexColor("#F3F7FB")
+MUTED = HexColor("#9BB4C9")
+OFF = HexColor("#17283C")
+LINE = HexColor("#2C4158")
 GOLD = HexColor("#C6A552")
-GROW = HexColor("#0E6B5C")
-WARN = HexColor("#8B2E2E")
+GROW = HexColor("#5EE0B5")
+WARN = HexColor("#F07171")
+AMBER = HexColor("#2A2416")
 
 
 def rrect(c, x, y, w, h, r=6, fill=None, stroke=None, sw=0.7):
@@ -120,6 +124,8 @@ def draw():
     m = 13
     gap = 7
 
+    c.setFillColor(BG)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
     c.setFillColor(NAVY)
     c.rect(0, H - header_h, W, header_h, fill=1, stroke=0)
     c.setFillColor(CYAN)
@@ -151,7 +157,7 @@ def draw():
     ow = (W - 2 * m - 2 * gap) / 3
     for i, (t, b) in enumerate(outcomes):
         x = m + i * (ow + gap)
-        rrect(c, x, out_y, ow, out_h, r=6, fill=NAVY)
+        rrect(c, x, out_y, ow, out_h, r=6, fill=HOT)
         c.setFillColor(CYAN)
         c.setFont("Inter-Bold", 8.0)
         c.drawString(x + 10, out_y + out_h - 15, f"0{i+1}   {t}")
@@ -184,7 +190,7 @@ def draw():
     for i, (hot, title, sub, body) in enumerate(tiers):
         x = m + i * (tw + gap)
         if hot:
-            rrect(c, x, tier_y, tw, tier_h, r=6, fill=NAVY)
+            rrect(c, x, tier_y, tw, tier_h, r=6, fill=HOT)
             c.setFillColor(CYAN)
             c.setFont("Inter-Semi", 6.0)
             c.drawString(x + 10, tier_y + tier_h - 11, "CISCO SUPPORT TIER")
@@ -200,7 +206,7 @@ def draw():
             c.setFillColor(MUTED)
             c.setFont("Inter-Semi", 6.0)
             c.drawString(x + 10, tier_y + tier_h - 11, "CISCO SUPPORT TIER")
-            c.setFillColor(NAVY)
+            c.setFillColor(TITLE)
             c.setFont("Inter-Bold", 9.0)
             c.drawString(x + 10, tier_y + tier_h - 24, title)
             c.setFillColor(MUTED)
@@ -215,9 +221,9 @@ def draw():
 
     # Col 1 — Standard IQ abilities
     x = m
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "Standard abilities  ·  Cisco IQ  ·  * = AI-powered", x + 10, col_y + col_h - 13)
-    kicker(c, "Complete landscape clarity", x + 10, col_y + col_h - 26, color=NAVY)
+    kicker(c, "Complete landscape clarity", x + 10, col_y + col_h - 26, color=TITLE)
     used = 28
     used += bullet_block(
         c,
@@ -235,7 +241,7 @@ def draw():
         leading=8.15,
     )
     y2 = col_y + col_h - 38 - used - 4
-    kicker(c, "Proactive resilience", x + 10, y2, color=NAVY)
+    kicker(c, "Proactive resilience", x + 10, y2, color=TITLE)
     bullet_block(
         c,
         [
@@ -252,7 +258,7 @@ def draw():
         size=6.25,
         leading=8.15,
     )
-    kicker(c, "Contextual learning  ·  Cisco U.", x + 10, col_y + 36, color=NAVY)
+    kicker(c, "Contextual learning  ·  Cisco U.", x + 10, col_y + 36, color=TITLE)
     bullet_block(
         c,
         [
@@ -268,7 +274,7 @@ def draw():
 
     # Col 2 — Rapid resolution + Signature
     x = m + cw + gap
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "Rapid resolution", x + 10, col_y + col_h - 13)
     used = bullet_block(
         c,
@@ -309,7 +315,7 @@ def draw():
 
     # Col 3 — IQ Link, On-Prem, vs PS
     x = m + 2 * (cw + gap)
-    rrect(c, x, col_y, cw, col_h, r=7, fill=white, stroke=LINE)
+    rrect(c, x, col_y, cw, col_h, r=7, fill=OFF, stroke=LINE)
     kicker(c, "Cisco IQ Link  ·  the value multiplier", x + 10, col_y + col_h - 13)
     draw_wrapped(
         c,
@@ -339,8 +345,8 @@ def draw():
 
     box_h = 102
     by = col_y + 8
-    rrect(c, x + 8, by, cw - 16, box_h, r=5, fill=HexColor("#F7F1E4"), stroke=GOLD, sw=0.85)
-    kicker(c, "Do not confuse Support with PS", x + 16, by + box_h - 12, color=HexColor("#8A5A12"))
+    rrect(c, x + 8, by, cw - 16, box_h, r=5, fill=AMBER, stroke=GOLD, sw=0.85)
+    kicker(c, "Do not confuse Support with PS", x + 16, by + box_h - 12, color=GOLD)
     c.setFillColor(GROW)
     c.setFont("Inter-Semi", 6.3)
     c.drawString(x + 16, by + box_h - 24, "Cisco Support / Partner Support")
