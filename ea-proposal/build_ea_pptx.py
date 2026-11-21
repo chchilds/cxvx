@@ -17,7 +17,9 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
-from parse_eamp import parse_eamp_workbook, suite_rollups
+from parse_eamp import apply_partner_margin, parse_eamp_workbook, suite_rollups
+
+DEFAULT_MARGIN_POINTS = 20
 
 # Widescreen 16:9
 SLIDE_W = Inches(13.333)
@@ -262,7 +264,7 @@ def add_table(slide, left, top, width, height, headers, rows, col_widths=None, f
 
 def footer(slide, page, total, confidential=True):
     add_rect(slide, 0, Inches(7.22), SLIDE_W, Inches(0.28), NAVY)
-    left = "Cisco Confidential  |  Indicative pricing — not an approved Cisco quote"
+    left = "Cisco Confidential  |  Customer pricing includes 20 pts partner margin  |  Not an approved Cisco quote"
     add_text_box(slide, Inches(0.4), Inches(7.24), Inches(10.2), Inches(0.24), left, size=10, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
     add_text_box(slide, Inches(11.2), Inches(7.24), Inches(1.7), Inches(0.24), f"{page}  /  {total}", size=10, color=WHITE, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
 
@@ -316,8 +318,13 @@ def build_presentation(data: dict, output: Path) -> Path:
     otd = float(total.get("one_time_discount") or 0)
     sw = float(total.get("software") or 0)
     svcs = float(total.get("services") or 0)
+    eamp_tcv = float(total.get("eamp_total") or tcv)
+    eamp_discount = float(total.get("eamp_discount_amount") or discount)
+    partner_margin = float(total.get("partner_margin") or 0)
+    margin_points = int(data.get("margin_points") or DEFAULT_MARGIN_POINTS)
     annual = annual_from_tcv(tcv, duration)
     discount_pct = (list_price - tcv) / list_price * 100 if list_price else 0
+    pricing_note = f"Customer pricing includes {margin_points} pts partner margin"
     customer_name = clean_text(meta.get("smart_account")) or "Customer"
     partner = clean_text(meta.get("partner"))
     proposal_id = clean_text(meta.get("proposal_id"))
@@ -360,7 +367,7 @@ def build_presentation(data: dict, output: Path) -> Path:
         Inches(3.2),
         Inches(11.5),
         Inches(0.7),
-        f"{years}-Year Enterprise Agreement Proposal",
+        f"{years}-Year Enterprise Agreement Proposal  ·  {margin_points} pts partner margin",
         size=24,
         color=WHITE,
     )
@@ -405,7 +412,7 @@ def build_presentation(data: dict, output: Path) -> Path:
         Inches(6.85),
         Inches(12),
         Inches(0.35),
-        "CISCO CONFIDENTIAL  ·  Indicative pricing only as of the date generated. This is not an approved Cisco quote.",
+        f"CISCO CONFIDENTIAL  ·  Indicative customer pricing includes {margin_points} points of partner margin on EAMP net. Not an approved Cisco quote.",
         size=11,
         color=RGBColor(0x7A, 0x90, 0xA4),
     )
@@ -416,7 +423,7 @@ def build_presentation(data: dict, output: Path) -> Path:
     agenda = [
         ("01", "Opportunity snapshot", "Customer, partner, commercial identifiers, and term."),
         ("02", "Why an Enterprise Agreement", "Price protection, True Forward, and a single enterprise term."),
-        ("03", "Investment summary", "Net TCV, list vs. net, software vs. services, annual view."),
+        ("03", "Investment summary", "Customer TCV with 20 pts partner margin, list vs. net, annual view."),
         ("04", "Portfolio detail", "Networking Infrastructure, Security (ISE), and CX services."),
         ("05", "Commercial terms & next steps", "Billing, True Forward, partner path, and recommended actions."),
         ("06", "Appendix", "SKU-level software, CX services, and how to read the EAMP columns."),
@@ -504,7 +511,7 @@ def build_presentation(data: dict, output: Path) -> Path:
 
     # ----- 5. Investment at a glance -----
     s = blank_slide(prs)
-    header_bar(s, "Investment at a glance", f"Net pricing  ·  {years}-year term  ·  {billing.lower()} billing")
+    header_bar(s, "Investment at a glance", f"{pricing_note}  ·  {years}-year term  ·  {billing.lower()} billing")
     cards = [
         ("Total contract value", money(tcv), f"{money(annual)} per year", CISCO),
         ("Software TCV", money(sw), f"{money(annual_from_tcv(sw, duration))} / year", NAVY_MID),
@@ -515,26 +522,30 @@ def build_presentation(data: dict, output: Path) -> Path:
         kpi_card(s, Inches(0.4) + i * Inches(3.2), Inches(1.1), Inches(3.05), Inches(1.28), label, value, caption, accent)
 
     # waterfall-style comparison
-    add_text_box(s, Inches(0.5), Inches(2.55), Inches(12), Inches(0.35), "From list price to net TCV", size=16, bold=True, color=NAVY)
+    add_text_box(s, Inches(0.5), Inches(2.55), Inches(12), Inches(0.35), "From list price to customer TCV", size=16, bold=True, color=NAVY)
     headers = ["", "Amount (USD)"]
     rows = [
         ["Total list price", money(list_price, 2)],
-        ["Program / subscription discounts", "− " + money(discount, 2)],
+        ["Cisco program / subscription discounts", "− " + money(eamp_discount, 2)],
         ["One-time discounts (OTD / IB / ramp / migration)", "− " + money(otd, 2)],
-        ["Total contract value (net)", money(tcv, 2)],
+        ["EAMP net (Cisco)", money(eamp_tcv, 2)],
+        [f"Partner margin ({margin_points} points)", "+ " + money(partner_margin, 2)],
+        ["Customer TCV", money(tcv, 2)],
     ]
-    add_table(s, Inches(0.5), Inches(2.95), Inches(7.6), Inches(2.35), headers, rows, col_widths=[Inches(5.4), Inches(2.2)], numeric_cols={1}, font_size=13)
+    add_table(s, Inches(0.5), Inches(2.88), Inches(7.6), Inches(3.05), headers, rows, col_widths=[Inches(5.4), Inches(2.2)], numeric_cols={1}, font_size=12)
 
-    add_round(s, Inches(8.35), Inches(2.95), Inches(4.45), Inches(2.35), NAVY)
-    add_text_box(s, Inches(8.55), Inches(3.1), Inches(4.05), Inches(0.3), "ANNUAL CASH VIEW", size=11, bold=True, color=CISCO)
-    add_text_box(s, Inches(8.55), Inches(3.42), Inches(4.05), Inches(0.5), money(annual), size=28, bold=True, color=WHITE)
+    add_round(s, Inches(8.35), Inches(2.88), Inches(4.45), Inches(3.05), NAVY)
+    add_text_box(s, Inches(8.55), Inches(3.05), Inches(4.05), Inches(0.28), "ANNUAL CASH VIEW", size=11, bold=True, color=CISCO)
+    add_text_box(s, Inches(8.55), Inches(3.35), Inches(4.05), Inches(0.5), money(annual), size=26, bold=True, color=WHITE)
     add_text_box(
         s,
         Inches(8.55),
-        Inches(4.0),
+        Inches(3.9),
         Inches(4.05),
-        Inches(1.1),
-        f"Five equal {billing.lower()} payments over {int(duration)} months, before any future True Forward. Software {money(annual_from_tcv(sw, duration))}/yr · Services {money(annual_from_tcv(svcs, duration))}/yr.",
+        Inches(1.8),
+        f"Five equal {billing.lower()} payments over {int(duration)} months, before any future True Forward.\n\n"
+        f"Software {money(annual_from_tcv(sw, duration))}/yr\nServices {money(annual_from_tcv(svcs, duration))}/yr\n"
+        f"Includes {margin_points} pts partner margin ({money(partner_margin)} on the 5-year TCV).",
         size=12,
         color=RGBColor(0xD5, 0xE4, 0xF0),
     )
@@ -542,20 +553,19 @@ def build_presentation(data: dict, output: Path) -> Path:
     add_text_box(
         s,
         Inches(0.5),
-        Inches(5.5),
+        Inches(6.05),
         Inches(12.3),
-        Inches(1.5),
-        "Discount mix: most Networking software lines carry a 10% programmatic discount and a 70% subscription discount. "
-        "ISE is at 68% subscription discount. Cisco CX / lifecycle services are in the high-30% range, with additional program-migration OTDs. "
-        "IB adjustment OTDs credit overlapping installed-base coverage so Hallmark is not double-charged for software already entitled.",
+        Inches(1.05),
+        f"Customer TCV replaces EAMP net and includes {margin_points} points of partner margin (20% gross margin; sell = EAMP net ÷ 0.80). "
+        "Cisco list, subscription %, and OTDs are unchanged. Networking software is 10% programmatic + 70% subscription; ISE is 68%; CX is ~37% plus migration OTDs.",
         size=13,
         color=MUTED,
     )
 
     # ----- 6. Financial summary by portfolio -----
     s = blank_slide(prs)
-    header_bar(s, "Financial summary by portfolio", "Net pricing from the EAMP Proposal Summary")
-    headers = ["Portfolio", "Software", "Services", "Net TCV", "List price", "Discount", "OTD", "Net vs list"]
+    header_bar(s, "Financial summary by portfolio", f"{pricing_note}  ·  Cisco list and OTDs unchanged")
+    headers = ["Portfolio", "Software", "Services", "Customer TCV", "List price", "Discount", "OTD", "Net vs list"]
     table_rows = []
     chart_cats = []
     chart_vals = []
@@ -710,7 +720,7 @@ def build_presentation(data: dict, output: Path) -> Path:
 
         # Highlight cards for biggest suites
         s = blank_slide(prs)
-        header_bar(s, "Networking — where software spend concentrates", "Net TCV of the four largest suites")
+        header_bar(s, "Networking — where software spend concentrates", f"Customer TCV of the four largest suites  ·  {margin_points} pts margin")
         top4 = sorted([r for r in rollups if r["tcv"] > 0], key=lambda r: r["tcv"], reverse=True)[:4]
         palettes = [CISCO, NAVY_MID, TEAL, ORANGE]
         for i, r in enumerate(top4):
@@ -730,8 +740,9 @@ def build_presentation(data: dict, output: Path) -> Path:
                 size=12,
                 color=MUTED,
             )
+        c9500 = next((i for i in net["software"] if i.get("part_number") == "E3N-C95005-A"), {})
         callouts = [
-            ("Catalyst DNA Switching", "Core campus/core switching software. C9500 48Y4C Advantage is the largest single SKU in the proposal at $235.7K net / 32 desired."),
+            ("Catalyst DNA Switching", f"Core campus/core switching software. C9500 48Y4C Advantage is the largest single SKU in the proposal at {money(c9500.get('tcv'))} customer TCV / {qty(c9500.get('qty_desired'))} desired."),
             ("Nexus Switching", "Data-center fabric: 30 × Nexus 9300 XF Advantage, 2 × XF2 Advantage, 4 × XF Essential. Full commit with Standard DCN support attached."),
             ("DNA Wireless + Spaces", "Wireless entitlement steps up from 132 IB to 525 desired APs, plus 350 Cisco Spaces ACT add-on licenses (partial commit)."),
             ("Meraki + Cisco Networking", "Meraki MX/MR/MS/MV plus Cisco Networking Switching Access Tier 1 (49 large / 42 medium Essential) for the evolving campus edge."),
@@ -892,14 +903,17 @@ def build_presentation(data: dict, output: Path) -> Path:
                 numeric_cols={3, 4, 5, 6, 7},
                 font_size=10,
             )
+            cx_enbd = next((i for i in net["services"] if i.get("part_number") == "E3-CX-CS-ENBD"), {})
+            cx_t14 = next((i for i in net["services"] if i.get("part_number") == "E3-CX-DCN-T14HR"), {})
+            otd_sum = sum(float(i.get("otd_program_migration") or 0) for i in net["services"])
             add_text_box(
                 s,
                 Inches(0.35),
                 Inches(6.4),
                 Inches(12.5),
                 Inches(0.65),
-                "Largest CX lines: Catalyst switching 8x5xNBD ($326.5K net, 124 IB) and Nexus 24x7x4 ($115.3K net, 10 IB). "
-                "Program-migration OTDs ($210.7K combined on these lines) credit the move onto EA services. Zero-dollar wireless/switching SW-only PIDs enroll coverage without incremental TCV.",
+                f"Largest CX lines: Catalyst switching 8x5xNBD ({money(cx_enbd.get('tcv'))} customer TCV, {qty(cx_enbd.get('qty_ib'))} IB) and Nexus 24x7x4 ({money(cx_t14.get('tcv'))} customer TCV, {qty(cx_t14.get('qty_ib'))} IB). "
+                f"Program-migration OTDs ({money(otd_sum)} combined) credit the move onto EA services. Zero-dollar wireless/switching SW-only PIDs enroll coverage without incremental TCV.",
                 size=12,
                 color=MUTED,
             )
@@ -1033,9 +1047,9 @@ def build_presentation(data: dict, output: Path) -> Path:
             Inches(4.65),
             Inches(12.2),
             Inches(2.0),
-            "Collaboration software TCV is $0 in this export. The $444.5K net is Cisco Support Standard 8x5xNBD for Collaboration "
-            "(E3-CX-COL-ENBD) against 145 installed-base assets, plus a $21.68 prior-period lapse charge. "
-            "A 36.9% subscription discount and a $42.7K program-migration OTD are already applied. "
+            f"Collaboration software TCV is $0 in this export. The {money(next((i.get('tcv') for i in colab['services'] if i.get('part_number')=='E3-CX-COL-ENBD'), 0))} customer TCV is Cisco Support Standard 8x5xNBD for Collaboration "
+            f"(E3-CX-COL-ENBD) against 145 installed-base assets, plus a {money(next((i.get('tcv') for i in colab['services'] if i.get('part_number')=='E3-CX-COL-LAPS-ST'), 0), 2)} prior-period lapse charge. "
+            f"A 36.9% subscription discount and a {money(sum(float(i.get('otd_program_migration') or 0) for i in colab['services']))} program-migration OTD are already applied. "
             "8x7xNCD is enrolled for 25 IB assets at $0 TCV. If Hallmark later adds Webex / Calling / CX suites, they can attach to this same EA term.",
             size=14,
             color=INK,
@@ -1050,7 +1064,7 @@ def build_presentation(data: dict, output: Path) -> Path:
         ("True Forward", "Annual on Full Commit", "Partial Commit (Meraki cameras, Spaces ACT) follows the EA TF calendar. Growth is billed going forward only."),
         ("Buying path", "2-tier via WWT", "World Wide Technology, Inc. is the EA partner (bill-to 1001363275). Price list: Global Price List US Availability."),
         ("Smart Account", customer_name, f"Buying Program {clean_text(meta.get('buying_program_id'))}. Motion: {clean_text(meta.get('ea_motion'))}."),
-        ("Pricing status", "Indicative / EAMP", "This file is not an approved Cisco quote. Convert in CCW with the EA Smart Account applied before order."),
+        ("Pricing status", f"{margin_points} pts margin", "Customer TCV replaces EAMP net at 20% gross margin (sell = EAMP ÷ 0.80). Indicative only — convert in CCW with the EA Smart Account before order."),
     ]
     for i, (kicker, title, blurb) in enumerate(terms):
         col = i % 3
@@ -1111,7 +1125,7 @@ def build_presentation(data: dict, output: Path) -> Path:
         ("OTD (IB adjustment)", "One-time credit so overlapping installed-base software is not paid twice."),
         ("OTD (Ramp)", "Phased-quantity credit on selected Cisco Networking wireless/switching lines."),
         ("OTD (Program migration)", "CX credit for moving coverage onto the EA services suite."),
-        ("TCV", "Net 60-month contract value after all discounts and OTDs. Annual invoice ≈ TCV ÷ 5."),
+        ("TCV", "Customer 60-month contract value: EAMP net with 20 points of partner margin (sell = EAMP ÷ 0.80). Annual invoice ≈ TCV ÷ 5."),
         ("Full vs Partial commit", "Full Commit: NTE unit price and annual TF. Partial / add-on: fixed discount, typically quarterly TF. Cameras and Spaces are Partial in this file."),
     ]
     for i, (title, blurb) in enumerate(defs):
@@ -1136,9 +1150,11 @@ def build_presentation(data: dict, output: Path) -> Path:
         Inches(4.5),
         "This presentation is derived from the Cisco EAMP Price Estimate export for HALLMARK CARDS, INCORPORATED "
         f"(Proposal ID {proposal_id}, Deal ID {deal_id}, Quote ID {quote_id}), generated {clean_text(meta.get('report_created_on'))}.\n\n"
-        "This file contains indicative pricing only as of the date generated. This is NOT an approved Cisco quote. "
-        "The pricing contained in this file is subject to change, to Cisco EA 3.0 Program Terms, to CCW conversion, "
-        "and to partner discounting by World Wide Technology.\n\n"
+        f"Displayed software, services, and TCV figures replace EAMP net with customer pricing that includes {margin_points} points of partner margin "
+        f"(20% gross margin; sell = EAMP net ÷ 0.80). Cisco list prices, subscription percentages, quantities, and OTDs are unchanged from the EAMP export. "
+        f"Partner margin on this quote is {money(partner_margin)} over the 5-year term.\n\n"
+        "This is NOT an approved Cisco quote. Pricing is indicative as of the date generated and is subject to change, "
+        "to Cisco EA 3.0 Program Terms, and to CCW conversion.\n\n"
         "Installed-base quantities, desired quantities, and OTDs should be validated before order. "
         "True Forward charges for future growth are not included in the TCV shown here.\n\n"
         "Cisco Confidential. Do not distribute outside Hallmark Cards, World Wide Technology, and the Cisco account team "
@@ -1164,14 +1180,22 @@ def main(argv=None):
         "--out",
         default=str(HERE / "HALLMARK_CARDS_INCORPORATED_Enterprise_Agreement_Proposal.pptx"),
     )
+    parser.add_argument(
+        "--margin",
+        type=float,
+        default=DEFAULT_MARGIN_POINTS,
+        help="Partner gross-margin points applied to EAMP net (default: 20).",
+    )
     args = parser.parse_args(argv)
-    data = parse_eamp_workbook(args.xlsx)
+    data = apply_partner_margin(parse_eamp_workbook(args.xlsx), points=args.margin)
     path = build_presentation(data, Path(args.out))
     print(f"Wrote {path} ({path.stat().st_size:,} bytes)")
     total = find_total_row(data["financial_summary"])
     print(f"Customer: {data['meta'].get('smart_account')}")
     print(f"Proposal: {data['meta'].get('proposal_id')}  Deal: {data['meta'].get('deal_id')}")
-    print(f"TCV: {money(total.get('total'), 2)}")
+    print(f"EAMP net: {money(total.get('eamp_total'), 2)}")
+    print(f"Partner margin ({int(args.margin)} pts): {money(total.get('partner_margin'), 2)}")
+    print(f"Customer TCV: {money(total.get('total'), 2)}")
     return 0
 
 

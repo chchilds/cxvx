@@ -336,6 +336,58 @@ def parse_portfolio_sheet(name: str, cells: dict[tuple[int, str], Any]) -> dict[
     }
 
 
+def margin_factor(points: float) -> float:
+    if points >= 100:
+        raise ValueError("Margin points must be less than 100")
+    return 1.0 / (1.0 - points / 100.0)
+
+
+def with_margin(amount: Any, points: float) -> Any:
+    if amount is None or amount == "":
+        return amount
+    try:
+        number = float(amount)
+    except (TypeError, ValueError):
+        return amount
+    if abs(number) < 0.0005:
+        return round(number, 2)
+    return round(number * margin_factor(points), 2)
+
+
+def apply_partner_margin(data: dict[str, Any], points: float = 20) -> dict[str, Any]:
+    """Replace EAMP net prices with customer prices at the given gross-margin points.
+
+    20 points of margin means 20% gross margin: sell = EAMP net / 0.80.
+    Cisco list, quantities, subscription %, and OTDs are left unchanged.
+    """
+    data["margin_points"] = points
+    data["margin_factor"] = margin_factor(points)
+    for row in data["financial_summary"]:
+        row["eamp_software"] = _num(row.get("software"))
+        row["eamp_services"] = _num(row.get("services"))
+        row["eamp_total"] = _num(row.get("total"))
+        row["eamp_discount_amount"] = _num(row.get("discount_amount"))
+        row["software"] = with_margin(row.get("software"), points)
+        row["services"] = with_margin(row.get("services"), points)
+        row["total"] = with_margin(row.get("total"), points)
+        row["partner_margin"] = round(row["total"] - row["eamp_total"], 2)
+        row["discount_amount"] = round(
+            _num(row.get("list_price")) - row["total"] - _num(row.get("one_time_discount")),
+            2,
+        )
+    header_keys = ("software_tcv", "services_tcv", "software_line_tcv", "services_line_tcv")
+    for portfolio in data["portfolios"]:
+        header = portfolio["header"]
+        for key in header_keys:
+            if header.get(key) is not None:
+                header[key] = with_margin(header[key], points)
+        for item in portfolio["software"] + portfolio["services"]:
+            if item.get("tcv") is not None:
+                item["eamp_tcv"] = item.get("tcv")
+                item["tcv"] = with_margin(item.get("tcv"), points)
+    return data
+
+
 def parse_eamp_workbook(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     with zipfile.ZipFile(path) as zf:
