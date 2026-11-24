@@ -11,7 +11,7 @@ from lxml import etree
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
@@ -37,6 +37,7 @@ OFF_WHITE = RGBColor(0xF5, 0xF7, 0xFA)
 ROW_ALT = RGBColor(0xF3, 0xF7, 0xFB)
 INK = RGBColor(0x12, 0x1C, 0x2B)
 MUTED = RGBColor(0x5B, 0x67, 0x75)
+ALA_CARTE = RGBColor(0x8A, 0x96, 0xA3)
 LINE = RGBColor(0xC9, 0xD3, 0xDE)
 TOTAL_BG = RGBColor(0x0B, 0x3A, 0x60)
 
@@ -418,7 +419,7 @@ def build_presentation(data: dict, output: Path) -> Path:
     agenda = [
         ("01", "Opportunity snapshot", "Customer, partner, commercial identifiers, and term."),
         ("02", "Why an Enterprise Agreement", "Price protection, True Forward, and a single enterprise term."),
-        ("03", "Investment summary", "Net TCV, list vs. net, software vs. services, annual view."),
+        ("03", "Investment vs a la carte", "EA net TCV compared with 5-year list for the same quantities."),
         ("04", "Portfolio detail", "Networking Infrastructure, Security (ISE), and CX services."),
         ("05", "Commercial terms & next steps", "Billing, True Forward, partner path, and recommended actions."),
         ("06", "Appendix", "SKU-level software, CX services, and how to read the EAMP columns."),
@@ -553,6 +554,195 @@ def build_presentation(data: dict, output: Path) -> Path:
         size=13,
         color=MUTED,
     )
+
+    # ----- EA vs a la carte -----
+    ala_annual = annual_from_tcv(list_price, duration)
+    avoided = list_price - tcv
+    ea_share = tcv / list_price * 100 if list_price else 0
+
+    s = blank_slide(prs)
+    header_bar(s, "EA vs a la carte", "Same 60-month quantities  ·  a la carte = Cisco list from the EAMP export")
+    kpis = [
+        ("A la carte (5-year list)", money(list_price), f"{money(ala_annual)} per year", ALA_CARTE),
+        ("Enterprise Agreement TCV", money(tcv), f"{money(annual)} per year", CISCO),
+        ("Avoided vs a la carte", money(avoided), f"{pct(100 - ea_share, 1)} below list", GREEN),
+        ("EA as a share of list", pct(ea_share, 1), "Same SKUs, term, and quantities", NAVY_MID),
+    ]
+    for i, (label, value, caption, accent) in enumerate(kpis):
+        kpi_card(s, Inches(0.4) + i * Inches(3.2), Inches(1.1), Inches(3.05), Inches(1.28), label, value, caption, accent)
+
+    add_text_box(s, Inches(0.5), Inches(2.55), Inches(12), Inches(0.32), "Five-year cash: a la carte list vs EA", size=16, bold=True, color=NAVY)
+    sw_list = sum(r["list_price"] for r in financial if r["portfolio"] in {"Networking Infrastructure", "Security"})
+    svcs_list = next((r["list_price"] for r in financial if r["portfolio"] == "Services"), 0)
+    compare_headers = ["", "A la carte (list)", "Enterprise Agreement", "Difference"]
+    compare_rows = [
+        ["5-year total", money(list_price, 2), money(tcv, 2), money(avoided, 2)],
+        ["Annual (÷ 5)", money(ala_annual, 2), money(annual, 2), money(ala_annual - annual, 2)],
+        ["Software", money(sw_list, 2), money(sw, 2), money(sw_list - sw, 2)],
+        ["CX / services", money(svcs_list, 2), money(svcs, 2), money(svcs_list - svcs, 2)],
+    ]
+    add_table(
+        s,
+        Inches(0.5),
+        Inches(2.95),
+        Inches(12.3),
+        None,
+        compare_headers,
+        compare_rows,
+        col_widths=[Inches(3.3), Inches(3.0), Inches(3.0), Inches(3.0)],
+        numeric_cols={1, 2, 3},
+        font_size=13,
+    )
+    add_text_box(
+        s,
+        Inches(0.5),
+        Inches(5.85),
+        Inches(12.3),
+        Inches(1.15),
+        "A la carte here is Cisco list for the same EA PIDs, quantities, and 60-month term in the EAMP export — not a separate transactional quote on classic (non-EA) SKUs. "
+        "Traditional 1- or 3-year a la carte PIDs can price differently; this is the apples-to-apples 5-year list vs EA net for this proposal.",
+        size=13,
+        color=MUTED,
+    )
+
+    s = blank_slide(prs)
+    header_bar(s, "EA vs a la carte by portfolio", "List vs EA net TCV  ·  identical desired quantities")
+    port_headers = ["Portfolio", "A la carte (list)", "EA net TCV", "Avoided", "Below list"]
+    port_rows = []
+    bar_cats = []
+    bar_list = []
+    bar_ea = []
+    for row in financial:
+        name = row["portfolio"]
+        vs_list = (1 - row["total"] / row["list_price"]) * 100 if row["list_price"] else 0
+        port_rows.append(
+            [
+                name,
+                money(row["list_price"], 2),
+                money(row["total"], 2),
+                money(row["list_price"] - row["total"], 2),
+                pct(vs_list, 1),
+            ]
+        )
+        if name.upper() != "TOTAL" and row["list_price"] > 0:
+            bar_cats.append(name.replace(" Infrastructure", "\nInfra.") if "Infrastructure" in name else name)
+            bar_list.append(row["list_price"])
+            bar_ea.append(row["total"])
+    add_table(
+        s,
+        Inches(0.35),
+        Inches(1.05),
+        Inches(12.6),
+        None,
+        port_headers,
+        port_rows,
+        col_widths=[Inches(3.2), Inches(2.4), Inches(2.4), Inches(2.4), Inches(2.2)],
+        numeric_cols={1, 2, 3, 4},
+        font_size=12,
+    )
+    chart_data = CategoryChartData()
+    chart_data.categories = bar_cats
+    chart_data.add_series("A la carte (list)", bar_list)
+    chart_data.add_series("EA net TCV", bar_ea)
+    chart = s.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.35), Inches(3.55), Inches(12.6), Inches(3.45), chart_data
+    ).chart
+    chart.has_legend = True
+    chart.legend.include_in_layout = False
+    chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+    chart.legend.font.size = Pt(11)
+    plot = chart.plots[0]
+    plot.has_data_labels = True
+    plot.data_labels.number_format = '"$"#,##0'
+    plot.data_labels.font.size = Pt(9)
+    plot.data_labels.font.color.rgb = INK
+    try:
+        chart.series[0].format.fill.solid()
+        chart.series[0].format.fill.fore_color.rgb = ALA_CARTE
+        chart.series[1].format.fill.solid()
+        chart.series[1].format.fill.fore_color.rgb = CISCO
+    except Exception:
+        pass
+    chart.category_axis.tick_labels.font.size = Pt(11)
+    chart.value_axis.tick_labels.number_format = '"$"#,##0'
+    chart.value_axis.tick_labels.font.size = Pt(10)
+    chart.value_axis.has_major_gridlines = True
+
+    s = blank_slide(prs)
+    header_bar(s, "EA vs a la carte by suite", "Software and CX suites in this proposal")
+    suite_headers = ["Portfolio", "Suite", "A la carte (list)", "EA net TCV", "Avoided", "Below list"]
+    suite_rows = []
+    for port in data["portfolios"]:
+        if not port.get("populated"):
+            continue
+        for kind, items in (("Software", port["software"]), ("Services", port["services"])):
+            for r in suite_rollups(items):
+                if r["list_price"] == 0 and r["tcv"] == 0:
+                    continue
+                vs_list = (1 - r["tcv"] / r["list_price"]) * 100 if r["list_price"] else 0
+                suite_rows.append(
+                    [
+                        port["name"] if kind == "Software" else "Services (CX)",
+                        r["suite"],
+                        money(r["list_price"]),
+                        money(r["tcv"]),
+                        money(r["list_price"] - r["tcv"]),
+                        pct(vs_list, 1),
+                    ]
+                )
+    suite_rows.append(
+        [
+            "TOTAL",
+            "",
+            money(list_price),
+            money(tcv),
+            money(avoided),
+            pct((avoided / list_price * 100) if list_price else 0, 1),
+        ]
+    )
+    add_table(
+        s,
+        Inches(0.25),
+        Inches(1.0),
+        Inches(12.8),
+        None,
+        suite_headers,
+        suite_rows,
+        col_widths=[Inches(2.45), Inches(3.35), Inches(1.85), Inches(1.75), Inches(1.7), Inches(1.7)],
+        numeric_cols={2, 3, 4, 5},
+        font_size=11,
+    )
+    add_text_box(
+        s,
+        Inches(0.3),
+        Inches(6.65),
+        Inches(12.7),
+        Inches(0.4),
+        "Networking software and ISE sit ~61–66% below list. CX / lifecycle suites are closer to list (~28–43% below) because service discounts are in the high-30% range.",
+        size=12,
+        color=MUTED,
+    )
+
+    s = blank_slide(prs)
+    header_bar(s, "What changes vs buying a la carte", "Program differences on top of the price delta")
+    element_rows = [
+        ("Quote structure", "SKU-by-SKU POs, mixed terms, re-quotes as the estate grows.", "One 5-year agreement, one book date, one Smart Account."),
+        ("Price over the term", "Next buy is at then-current list or a new discount request.", "Full Commit suites: not-to-exceed unit price for the remaining term."),
+        ("Growth", "Purchase more licenses when needed; some programs true-up retroactively.", "True Forward: growth billed going forward only, on the EA calendar."),
+        ("ISE / Security headroom", "Additional seats are a new a la carte (or EA add) transaction.", "Full Commit Security: 15% growth allowance after the first six months."),
+        ("Right-sizing", "Unused licenses typically stay paid; new SKUs need a new quote.", "Value shift at True Forward can move unused value inside eligible suites."),
+        ("CX / lifecycle", "Separate SNTC / SSPT quotes, often different end dates.", "CX suites co-term to this EA; coverage follows the underlying software."),
+    ]
+    for i, (title, left_blurb, right_blurb) in enumerate(element_rows):
+        top = Inches(1.05) + i * Inches(0.95)
+        add_round(s, Inches(0.35), top, Inches(2.35), Inches(0.85), NAVY)
+        add_text_box(s, Inches(0.48), top + Inches(0.18), Inches(2.1), Inches(0.55), title, size=13, bold=True, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
+        add_round(s, Inches(2.85), top, Inches(4.95), Inches(0.85), OFF_WHITE, LINE)
+        add_text_box(s, Inches(3.0), top + Inches(0.08), Inches(4.65), Inches(0.2), "A LA CARTE", size=10, bold=True, color=MUTED)
+        add_text_box(s, Inches(3.0), top + Inches(0.30), Inches(4.65), Inches(0.48), left_blurb, size=12, color=INK)
+        add_round(s, Inches(7.95), top, Inches(4.95), Inches(0.85), WHITE, LINE)
+        add_text_box(s, Inches(8.1), top + Inches(0.08), Inches(4.65), Inches(0.2), "ENTERPRISE AGREEMENT", size=10, bold=True, color=CISCO)
+        add_text_box(s, Inches(8.1), top + Inches(0.30), Inches(4.65), Inches(0.48), right_blurb, size=12, color=INK)
 
     # ----- 6. Financial summary by portfolio -----
     s = blank_slide(prs)
