@@ -472,10 +472,11 @@ def build_presentation(data: dict) -> Presentation:
         ("04", "Networking software", "Meraki, Catalyst DNA, Nexus, and Cisco Networking SKUs."),
         ("05", "CX / lifecycle services", "Signature and Standard support across the install base."),
         ("06", "Applications", "ThousandEyes observability adder (units, users, Insights, TAM)."),
-        ("07", "Billing view & next steps", "Indicative annual payments, assumptions, and close plan."),
+        ("07", "Professional Services attach", "Where Cisco PS offerings can be used against these EA items."),
+        ("08", "Billing view & next steps", "Indicative annual payments, assumptions, and close plan."),
     ]
     for i, (num, title, blurb) in enumerate(items):
-        y = Inches(1.2) + i * Inches(0.78)
+        y = Inches(1.15) + i * Inches(0.70)
         add_round(s, Inches(0.45), y, Inches(12.4), Inches(0.7), WHITE, 0.12)
         add_round(s, Inches(0.62), y + Inches(0.14), Inches(0.48), Inches(0.42), NAVY, 0.2)
         add_text_box(s, Inches(0.62), y + Inches(0.18), Inches(0.48), Inches(0.36),
@@ -654,7 +655,7 @@ def build_presentation(data: dict) -> Presentation:
         "Collaboration — no SKUs on this estimate",
         "Hybrid Cloud — no SKUs on this estimate",
         "Provider Connectivity — no SKUs",
-        "Cisco Professional Services — no SKUs",
+        "Cisco Professional Services — not on this estimate (see mapping)",
         "Hardware / non-EA product (out of file)",
     ]
     add_text_box(s, Inches(0.45), Inches(1.18), Inches(7.4), Inches(0.3),
@@ -896,6 +897,65 @@ def build_presentation(data: dict) -> Presentation:
                  size=13, color=SLATE)
 
     # ------------------------------------------------------------------
+    # Cisco Professional Services mapping
+    # ------------------------------------------------------------------
+    s = slide()
+    paint_content_bg(s)
+    add_header(s, "Cisco Professional Services against this EA",
+               "Mapped from the Cisco Professional Services Customer Value Deck (v8.0, September 2026)  ·  not priced on EAMP 9354137")
+
+    add_card(s, Inches(0.4), Inches(1.15), Inches(4.05), Inches(1.12),
+             "Lifecycle coverage", "Plan → Optimize",
+             "PDI, Migrate, Assessments  ·  CX = Operate", 16)
+    add_card(s, Inches(4.65), Inches(1.15), Inches(4.05), Inches(1.12),
+             "Architecture-led", "ENT  ·  DC  ·  TE",
+             "Networking, Nexus, ThousandEyes", 16)
+    add_card(s, Inches(8.9), Inches(1.15), Inches(4.0), Inches(1.12),
+             "How it is bought", "Services for EA",
+             "Or subscription / project  ·  not in this file", 16)
+
+    headers = ["EA item in this adder", "Cisco Professional Services offering", "Where it is used"]
+    ps_rows = [
+        ["Catalyst DNA Switching",
+         "Campus Network PDI; Wi-Fi 7 & Enterprise Switching Hybrid Architecture; Campus Refresh Blueprint",
+         "Design and implement Catalyst 9K / IE licenses and Catalyst Center"],
+        ["Catalyst DNA Wireless",
+         "Wireless LAN Plan, Design, Implement, and Migrate",
+         "Stand up wireless at EA scale (1,497 APs in this adder)"],
+        ["Nexus Switching",
+         "Data Center Networking PDI and Migration; VXLAN EVPN PDI",
+         "Architect Nexus 9300 Essential licenses into the DC fabric"],
+        ["Meraki MX / MS / MR / MV",
+         "Meraki PDI; Branch Refresh PDI; Cisco Spaces / smart workspaces",
+         "Branch, switching, wireless, and camera adoption"],
+        ["ENTWAN / Secure WAN (CX Signature)",
+         "SD-WAN PDI and Migrate; Services as Code for SD-WAN",
+         "Align WAN change with EA software and CX Signature coverage"],
+        ["ThousandEyes",
+         "ThousandEyes Implementation Services; Insights for Internet and Cloud Visibility",
+         "Onboard 2,200 units, 110 EUM users, Insights, and TAM"],
+        ["Cross-suite / EA program",
+         "Architecture Blueprint & Journey Map; Services as Code; Solution Validation; Assessments",
+         "De-risk the adder, automate config, and validate before cutover"],
+    ]
+    table = add_table(s, 1 + len(ps_rows), 3, Inches(0.35), Inches(2.42), Inches(12.6), Inches(4.28))
+    widths = [2.85, 5.55, 4.2]
+    for i, w in enumerate(widths):
+        table.columns[i].width = Inches(w)
+    for j, h in enumerate(headers):
+        style_cell(table.cell(0, j), h, size=10, bold=True, color=WHITE, fill=HEADER_ROW)
+    for i, row in enumerate(ps_rows):
+        fill = WHITE if i % 2 == 0 else ROW_ALT
+        style_cell(table.cell(i + 1, 0), row[0], size=10, bold=True, color=NAVY, fill=fill)
+        style_cell(table.cell(i + 1, 1), row[1], size=10, color=SLATE, fill=fill)
+        style_cell(table.cell(i + 1, 2), row[2], size=10, color=SLATE, fill=fill)
+
+    add_text_box(s, Inches(0.4), Inches(6.75), Inches(12.5), Inches(0.38),
+                 "Source: Cisco Professional Services Customer Value Deck, Version 8.0, September 2026.  "
+                 "CX Signature/Standard on this adder is operate/break-fix; Professional Services is a separate plan/design/implement/migrate attach.",
+                 size=10, color=GRAY)
+
+    # ------------------------------------------------------------------
     # Annual billing view
     # ------------------------------------------------------------------
     s = slide()
@@ -1025,7 +1085,8 @@ def build_presentation(data: dict) -> Presentation:
          "• Cisco quote approval — this file is explicitly not an approved quote.\n"
          "• Reseller services bill-to shows Calian Corp; confirm if still correct for Trace3.\n"
          "• Partial Meraki MV and ThousandEyes TAM commitments vs full suites.\n"
-         "• Any additional suites 12–17 beyond what EAMP priced here."),
+         "• Any additional suites 12–17 beyond what EAMP priced here.\n"
+         "• Cisco Professional Services attach against these EA suites (not on this estimate)."),
     ]
     for i, (title, body) in enumerate(col_a):
         y = Inches(1.2) + i * Inches(2.8)
