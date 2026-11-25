@@ -20,8 +20,6 @@ HERE = Path(__file__).resolve().parent
 XLSX = HERE / "POLARIS_INC_-_EAMP_Price_Estimate_-_ID_9354137.xlsx"
 OUT = HERE / "POLARIS_INC_Enterprise_Agreement_Proposal.pptx"
 
-PRICE_FACTOR = Decimal("1.20")
-
 # Widescreen 16:9
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
@@ -58,7 +56,7 @@ def money(value: Decimal) -> Decimal:
 
 
 def customer_of(net: Decimal) -> Decimal:
-    return money(D(net) * PRICE_FACTOR)
+    return money(D(net) * Decimal("6") / Decimal("5"))
 
 
 def usd(value: Decimal, cents: bool = True) -> str:
